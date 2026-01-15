@@ -7,7 +7,6 @@ import { toast } from "react-hot-toast";
 import NoteCard from "../components/NoteCard";
 import NotesNotFound from "../components/NotesNotFound";
 
-
 const HomePage = () => {
   const [isRateLimited, setIsRateLimited] = useState(false);
   const [notes, setNotes] = useState([]);
@@ -22,11 +21,18 @@ const HomePage = () => {
         setNotes(res.data);
         setIsRateLimited(false);
       } catch (error) {
-        console.error("Error fetching notes:", error.response?.data || error.message);
+        console.error(
+          "Error fetching notes:",
+          error.response?.data || error.message
+        );
         if (error.response?.status === 429) {
           setIsRateLimited(true);
         } else {
-          toast.error(error.response?.data?.error || error.response?.data?.message || "Failed to load notes");
+          toast.error(
+            error.response?.data?.error ||
+              error.response?.data?.message ||
+              "Failed to load notes"
+          );
         }
       } finally {
         setLoading(false);
@@ -49,8 +55,7 @@ const HomePage = () => {
           </div>
         )}
 
-{notes.length === 0 &&  !isRateLimited && <NotesNotFound />}
-
+        {notes.length === 0 && !isRateLimited && <NotesNotFound />}
 
         {notes.length > 0 && !isRateLimited && (
           <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-2 lg:grid-cols-3 gap-6">

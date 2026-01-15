@@ -24,14 +24,22 @@ app.use(
 
 app.use(express.json());
 
+// Serve static files from frontend dist BEFORE middleware
+app.use(express.static(path.join(__dirname, "../frontend/dist")));
+
 // Initialize database connection before processing requests
 let dbConnected = false;
 let dbConnectionError = null;
 
 // Middleware to ensure DB is connected (only for API routes, not static files)
 app.use((req, res, next) => {
-  // Skip DB connection check for static files and health check
-  if (req.path.startsWith("/.") || req.path === "/api/health" || !req.path.startsWith("/api")) {
+  // Only check DB for API routes
+  if (!req.path.startsWith("/api")) {
+    return next();
+  }
+
+  // Skip DB connection check for health check
+  if (req.path === "/api/health") {
     return next();
   }
 
@@ -46,7 +54,10 @@ app.use((req, res, next) => {
       .catch((error) => {
         dbConnectionError = error.message;
         console.error("Failed to connect to database:", error.message);
-        res.status(500).json({ error: "Database connection failed", details: error.message });
+        res.status(500).json({
+          error: "Database connection failed",
+          details: error.message,
+        });
       });
   } else {
     next();
@@ -59,15 +70,12 @@ app.use("/api/notes", notesRoutes);
 
 // Health check endpoint
 app.get("/api/health", (req, res) => {
-  res.json({ 
+  res.json({
     status: "ok",
     dbConnected: dbConnected,
-    dbError: dbConnectionError
+    dbError: dbConnectionError,
   });
 });
-
-// Serve static files from frontend dist
-app.use(express.static(path.join(__dirname, "../frontend/dist")));
 
 // Catch-all route for SPA - serve index.html for all non-API routes
 app.get("*", (req, res) => {
