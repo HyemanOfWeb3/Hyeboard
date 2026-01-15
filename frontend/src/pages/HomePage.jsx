@@ -11,15 +11,17 @@ const HomePage = () => {
   const [isRateLimited, setIsRateLimited] = useState(false);
   const [notes, setNotes] = useState([]);
   const [loading, setLoading] = useState(true);
+  const [error, setError] = useState(null);
 
   useEffect(() => {
     const fetchNotes = async () => {
       try {
+        console.log("Fetching notes from API...");
         const res = await api.get("/notes");
-        // const data = await res.json()
-        console.log(res.data);
-        setNotes(res.data);
+        console.log("Notes fetched successfully:", res.data);
+        setNotes(Array.isArray(res.data) ? res.data : []);
         setIsRateLimited(false);
+        setError(null);
       } catch (error) {
         console.error(
           "Error fetching notes:",
@@ -28,11 +30,13 @@ const HomePage = () => {
         if (error.response?.status === 429) {
           setIsRateLimited(true);
         } else {
-          toast.error(
+          const errorMsg =
             error.response?.data?.error ||
-              error.response?.data?.message ||
-              "Failed to load notes"
-          );
+            error.response?.data?.message ||
+            error.message ||
+            "Failed to load notes";
+          setError(errorMsg);
+          toast.error(errorMsg);
         }
       } finally {
         setLoading(false);
@@ -55,9 +59,20 @@ const HomePage = () => {
           </div>
         )}
 
-        {notes.length === 0 && !isRateLimited && <NotesNotFound />}
+        {error && !loading && (
+          <div className="text-center py-10">
+            <p className="text-error text-lg">{error}</p>
+            <p className="text-sm mt-4">
+              Check browser console for more details.
+            </p>
+          </div>
+        )}
 
-        {notes.length > 0 && !isRateLimited && (
+        {!loading && !error && notes.length === 0 && !isRateLimited && (
+          <NotesNotFound />
+        )}
+
+        {!loading && !error && notes.length > 0 && !isRateLimited && (
           <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-2 lg:grid-cols-3 gap-6">
             {notes.map((note) => (
               <NoteCard key={note._id} note={note} setNotes={setNotes} />
