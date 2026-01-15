@@ -4,7 +4,15 @@ import dotenv from "dotenv";
 // Load environment variables from ../.env (if present)
 dotenv.config();
 
-const MONGO_URI = process.env.MONGO_URI || "mongodb://127.0.0.1:27017/notes_db";
+const MONGO_URI = process.env.MONGO_URI;
+
+// In production, MONGO_URI is required
+if (!MONGO_URI) {
+  console.warn("⚠️  MONGO_URI environment variable is not set!");
+  console.warn(
+    "Set MONGO_URI in your environment variables for database connectivity"
+  );
+}
 
 // Cache connection for serverless functions
 let cachedConnection = null;
@@ -18,8 +26,10 @@ export const connectDB = async () => {
     }
 
     // Ensure a valid connection string is provided
-    if (typeof MONGO_URI !== "string" || MONGO_URI.length === 0) {
-      throw new Error("MONGO_URI is not defined or is not a string");
+    if (!MONGO_URI || typeof MONGO_URI !== "string" || MONGO_URI.length === 0) {
+      throw new Error(
+        "MONGO_URI environment variable is required but not set. Please configure it in your deployment settings."
+      );
     }
 
     console.log("Creating new MongoDB connection...");

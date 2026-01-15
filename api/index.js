@@ -23,6 +23,25 @@ app.use(
 );
 
 app.use(express.json());
+
+// Initialize database connection before processing requests
+let dbConnected = false;
+
+// Middleware to ensure DB is connected
+app.use(async (req, res, next) => {
+  if (!dbConnected) {
+    try {
+      await connectDB();
+      dbConnected = true;
+      console.log("Database initialized for request processing");
+    } catch (error) {
+      console.error("Failed to connect to database:", error.message);
+      return res.status(500).json({ error: "Database connection failed" });
+    }
+  }
+  next();
+});
+
 app.use(rateLimiter);
 
 app.use("/api/notes", notesRoutes);
@@ -40,10 +59,10 @@ app.get("*", (req, res) => {
   res.sendFile(path.join(__dirname, "../frontend/dist/index.html"));
 });
 
-// Initialize database connection (must be done before handling requests)
+// Initialize database connection (can be called at startup, but will be retried per request if needed)
 connectDB().catch((err) => {
-  console.error("Database connection error:", err.message);
-  // Don't throw - allow the app to start even if DB connection fails initially
+  console.warn("Initial database connection attempt failed:", err.message);
+  console.log("Will retry connection on first request");
 });
 
 export default app;
