@@ -23,18 +23,21 @@ const HomePage = () => {
         setIsRateLimited(false);
         setError(null);
       } catch (error) {
+        console.error("Full error object:", error);
         console.error(
           "Error fetching notes:",
           error.response?.data || error.message
         );
         if (error.response?.status === 429) {
           setIsRateLimited(true);
+          setError("Too many requests. Please try again later.");
         } else {
           const errorMsg =
             error.response?.data?.error ||
             error.response?.data?.message ||
             error.message ||
             "Failed to load notes";
+          console.log("Setting error to:", errorMsg);
           setError(errorMsg);
           toast.error(errorMsg);
         }
@@ -47,33 +50,33 @@ const HomePage = () => {
   }, []);
 
   return (
-    <div className="min-h-screen">
+    <div className="min-h-screen bg-base-100">
       <Navbar />
 
       {isRateLimited && <RateLimitedUI />}
 
       <div className="max-w-7xl mx-auto p-4 mt-6">
+        {/* Always show something */}
         {loading && (
-          <div className="text-center text-primary py-10">
-            Loading notes....
+          <div className="alert alert-info">
+            <span>Loading notes....</span>
           </div>
         )}
 
-        {error && !loading && (
-          <div className="text-center py-10">
-            <p className="text-error text-lg">{error}</p>
-            <p className="text-sm mt-4">
-              Check browser console for more details.
-            </p>
+        {!loading && error && (
+          <div className="alert alert-error">
+            <span>{error}</span>
           </div>
         )}
 
         {!loading && !error && notes.length === 0 && !isRateLimited && (
-          <NotesNotFound />
+          <div className="alert alert-warning">
+            <span>No notes found. Create your first note!</span>
+          </div>
         )}
 
         {!loading && !error && notes.length > 0 && !isRateLimited && (
-          <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-2 lg:grid-cols-3 gap-6">
+          <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-6">
             {notes.map((note) => (
               <NoteCard key={note._id} note={note} setNotes={setNotes} />
             ))}
