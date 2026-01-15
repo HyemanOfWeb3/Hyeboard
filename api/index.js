@@ -40,9 +40,10 @@ app.get("*", (req, res) => {
   res.sendFile(path.join(__dirname, "../frontend/dist/index.html"));
 });
 
-// Initialize database connection
+// Initialize database connection (must be done before handling requests)
 connectDB().catch((err) => {
-  console.error("Database connection error:", err);
+  console.error("Database connection error:", err.message);
+  // Don't throw - allow the app to start even if DB connection fails initially
 });
 
 export default app;

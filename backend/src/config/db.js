@@ -12,25 +12,40 @@ dotenv.config();
 const MONGO_URI = process.env.MONGO_URI || "mongodb://127.0.0.1:27017/notes_db";
 
 
+// Cache connection for serverless functions
+let cachedConnection = null;
+
 export const connectDB = async () => {
   try {
+    // Return cached connection if it exists and is still valid
+    if (cachedConnection && mongoose.connection.readyState === 1) {
+      console.log("Using cached MongoDB connection");
+      return cachedConnection;
+    }
+
     // Ensure a valid connection string is provided
     if (typeof MONGO_URI !== "string" || MONGO_URI.length === 0) {
       throw new Error("MONGO_URI is not defined or is not a string");
     }
 
-    // Use the resolved MONGO_URI constant (not process.env directly)
-    await mongoose.connect(MONGO_URI, {
-      // Recommended options for stable connections
-      serverSelectionTimeoutMS: 5000,
+    console.log("Creating new MongoDB connection...");
+
+    // Connect to MongoDB
+    const connection = await mongoose.connect(MONGO_URI, {
+      serverSelectionTimeoutMS: 10000,
       socketTimeoutMS: 45000,
+      // Serverless-friendly options
+      maxPoolSize: 1,
+      minPoolSize: 0,
     });
 
+    // Cache the connection
+    cachedConnection = connection;
     console.log("MongoDB connected successfully!");
+    
+    return connection;
   } catch (error) {
     console.error("Error connecting to the database:", error.message || error);
-    // Do not forcefully exit in deployed environments here — let the caller decide.
-    // Re-throw so callers (or process managers like PM2/Render) can handle restarts.
     throw error;
   }
 };
