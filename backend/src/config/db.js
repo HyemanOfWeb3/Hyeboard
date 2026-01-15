@@ -1,16 +1,10 @@
 import mongoose from "mongoose";
 import dotenv from "dotenv";
 
-
-
-
-
-
 // Load environment variables from ../.env (if present)
 dotenv.config();
 
 const MONGO_URI = process.env.MONGO_URI || "mongodb://127.0.0.1:27017/notes_db";
-
 
 // Cache connection for serverless functions
 let cachedConnection = null;
@@ -42,7 +36,7 @@ export const connectDB = async () => {
     // Cache the connection
     cachedConnection = connection;
     console.log("MongoDB connected successfully!");
-    
+
     return connection;
   } catch (error) {
     console.error("Error connecting to the database:", error.message || error);

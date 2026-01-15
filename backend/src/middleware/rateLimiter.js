@@ -1,24 +1,21 @@
 import ratelimit from "../config/upstash.js";
 
-
 const rateLimiter = async (req, res, next) => {
-    try {
-        const { success } = await ratelimit.limit("my-rate-limit");
-        
-        if (!success) {
-            return res.status(429).json({
-                message: "Too many attempts. Please try again later."
-            });
-        }
+  try {
+    const { success } = await ratelimit.limit("my-rate-limit");
 
-        next();
-
-    } catch (error) {
-        console.log("Rate Limit Error:", error);
-        // Allow request if rate limiter fails (don't block requests)
-        next();
+    if (!success) {
+      return res.status(429).json({
+        message: "Too many attempts. Please try again later.",
+      });
     }
-};
 
+    next();
+  } catch (error) {
+    console.log("Rate Limit Error:", error);
+    // Allow request if rate limiter fails (don't block requests)
+    next();
+  }
+};
 
 export default rateLimiter;

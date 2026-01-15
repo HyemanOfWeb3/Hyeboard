@@ -16,7 +16,7 @@ try {
   console.warn("Rate limiter not configured:", error.message);
   // Create a mock rate limiter if Redis is not configured
   ratelimit = {
-    limit: async () => ({ success: true })
+    limit: async () => ({ success: true }),
   };
 }
 
