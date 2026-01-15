@@ -21,10 +21,10 @@ app.use(
 app.use(express.json());
 app.use(rateLimiter);
 
-app.use("/api/notes", notesRoutes);
+app.use("/notes", notesRoutes);
 
 // Health check endpoint
-app.get("/api/health", (req, res) => {
+app.get("/health", (req, res) => {
   res.json({ status: "ok" });
 });
 
