@@ -26,20 +26,31 @@ app.use(express.json());
 
 // Initialize database connection before processing requests
 let dbConnected = false;
+let dbConnectionError = null;
 
-// Middleware to ensure DB is connected
-app.use(async (req, res, next) => {
-  if (!dbConnected) {
-    try {
-      await connectDB();
-      dbConnected = true;
-      console.log("Database initialized for request processing");
-    } catch (error) {
-      console.error("Failed to connect to database:", error.message);
-      return res.status(500).json({ error: "Database connection failed" });
-    }
+// Middleware to ensure DB is connected (only for API routes, not static files)
+app.use((req, res, next) => {
+  // Skip DB connection check for static files and health check
+  if (req.path.startsWith("/.") || req.path === "/api/health" || !req.path.startsWith("/api")) {
+    return next();
   }
-  next();
+
+  if (!dbConnected) {
+    connectDB()
+      .then(() => {
+        dbConnected = true;
+        dbConnectionError = null;
+        console.log("Database initialized for request processing");
+        next();
+      })
+      .catch((error) => {
+        dbConnectionError = error.message;
+        console.error("Failed to connect to database:", error.message);
+        res.status(500).json({ error: "Database connection failed", details: error.message });
+      });
+  } else {
+    next();
+  }
 });
 
 app.use(rateLimiter);
@@ -48,7 +59,11 @@ app.use("/api/notes", notesRoutes);
 
 // Health check endpoint
 app.get("/api/health", (req, res) => {
-  res.json({ status: "ok" });
+  res.json({ 
+    status: "ok",
+    dbConnected: dbConnected,
+    dbError: dbConnectionError
+  });
 });
 
 // Serve static files from frontend dist

@@ -22,11 +22,11 @@ const HomePage = () => {
         setNotes(res.data);
         setIsRateLimited(false);
       } catch (error) {
-        console.log(error);
+        console.error("Error fetching notes:", error.response?.data || error.message);
         if (error.response?.status === 429) {
           setIsRateLimited(true);
         } else {
-          toast.error("Failed to load notes");
+          toast.error(error.response?.data?.error || error.response?.data?.message || "Failed to load notes");
         }
       } finally {
         setLoading(false);
