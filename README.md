@@ -50,7 +50,7 @@ A full-stack web application for creating, reading, updating, and deleting notes
 
    Create a `.env` file in the `backend` directory with:
    ```
-   MONGODB_URI=your_mongodb_connection_string
+   MONGO_URI=your_mongodb_connection_string
    UPSTASH_REDIS_REST_URL=your_upstash_url
    UPSTASH_REDIS_REST_TOKEN=your_upstash_token
    PORT=5000
