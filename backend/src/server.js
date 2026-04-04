@@ -17,13 +17,12 @@ const __dirname = path.resolve();
 // const __dirname = path.dirname(new URL(import.meta.url).pathname);
 
 //middleware
-if (process.env.NODE_ENV !== "production") {
-  app.use(
-    cors({
-      origin: "http://localhost:5173", // Adjust the origin as needed
-    })
-  );
-}
+app.use(
+  cors({
+    origin: process.env.NODE_ENV === "production" ? "*" : "http://localhost:5173",
+    credentials: true,
+  })
+);
 app.use(express.json());
 app.use(rateLimiter);
 
