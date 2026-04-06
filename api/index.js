@@ -3,6 +3,7 @@ import cors from "cors";
 import dotenv from "dotenv";
 import path from "path";
 import { fileURLToPath } from "url";
+import fs from "fs";
 
 import notesRoutes from "../backend/src/routes/notesRoutes.js";
 import { connectDB } from "../backend/src/config/db.js";
@@ -19,13 +20,23 @@ app.use(
   cors({
     origin: process.env.FRONTEND_URL || "*",
     credentials: true,
-  })
+  }),
 );
 
 app.use(express.json());
 
-// Serve static files from frontend dist BEFORE middleware
-app.use(express.static(path.join(__dirname, "../frontend/dist")));
+// Check if frontend dist exists and serve static files
+const frontendDistPath = path.join(__dirname, "../frontend/dist");
+const distExists = fs.existsSync(frontendDistPath);
+
+if (distExists) {
+  app.use(express.static(frontendDistPath));
+} else {
+  console.warn("⚠️  Frontend dist folder not found at:", frontendDistPath);
+  console.warn(
+    "Frontend static files will not be served. Run: cd frontend && npm run build",
+  );
+}
 
 // Initialize database connection before processing requests
 let dbConnected = false;
@@ -74,12 +85,21 @@ app.get("/api/health", (req, res) => {
     status: "ok",
     dbConnected: dbConnected,
     dbError: dbConnectionError,
+    frontendDistAvailable: distExists,
   });
 });
 
 // Catch-all route for SPA - serve index.html for all non-API routes
 app.get("*", (req, res) => {
-  res.sendFile(path.join(__dirname, "../frontend/dist/index.html"));
+  const indexPath = path.join(__dirname, "../frontend/dist/index.html");
+  if (fs.existsSync(indexPath)) {
+    res.sendFile(indexPath);
+  } else {
+    res.status(404).json({
+      error: "Frontend not found",
+      message: "Please build the frontend first: cd frontend && npm run build",
+    });
+  }
 });
 
 // Initialize database connection (can be called at startup, but will be retried per request if needed)
