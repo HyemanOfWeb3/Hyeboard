@@ -1,48 +1,21 @@
-import { PenSquareIcon, Trash2Icon } from "lucide-react";
+import { Heart, MoreHorizontal, Pin, Trash2 } from "lucide-react";
 import { Link } from "react-router";
 import { formatDate } from "../lib/utils";
-import api from "../lib/axios";
-import { toast } from "react-hot-toast";
 
-const NoteCard = ({ note, setNotes }) => {
-  const handleDelete = async (e, id) => {
-    e.preventDefault(); // Prevent navigation
-
-    if (!window.confirm("Are you sure you want to delete this note?")) {
-      return;
-    }
-
-    try {
-      await api.delete(`/notes/${id}`);
-      setNotes((prev) => prev.filter((note) => note._id !== id));
-      toast.success("Note deleted successfully");
-    } catch (error) {
-      console.log("Error in handleDelete:", error);
-      toast.error("Failed to delete note");
-    }
-  };
-
+const NoteCard = ({ note, onToggle, onDelete, isTrash = false, onRestore, onPermanentDelete }) => {
   return (
     <Link
       to={`/note/${note._id}`}
-      className="card bg-base-100 hover:shadow-lg transition-all duration-200 border-t-4 border-solid border-[#00FF9D]"
+      className="note-card"
     >
-      <div className="card-body">
-        <h3 className="card-title text-base-content">{note.title}</h3>
-        <p className="text-base-content/70 line-clamp-3">{note.content}</p>
-        <div className="card-actions justify-between items-center mt-4">
-          <span className="text-sm text-base-content/60">
-            {formatDate(new Date(note.createdAt))}
-          </span>
-          <div className="flex items-center gap-1">
-            <PenSquareIcon className="size-4" />
-            <button
-              className="btn btn-ghost btn-xs text-error"
-              onClick={(e) => handleDelete(e, note._id)}
-            >
-              <Trash2Icon className="size-4" />
-            </button>
-          </div>
+      <div className="note-card__body">
+        <div className="note-card__topline"><span className="note-card__date">{formatDate(new Date(note.updatedAt || note.createdAt))}</span><div className="note-card__signals">{note.isPinned && <Pin size={15} fill="currentColor" />}{note.isFavorite && <Heart size={15} fill="currentColor" />}</div></div>
+        <h3>{note.title || "Untitled note"}</h3>
+        <p>{note.content || "No content yet"}</p>
+        <div className="note-card__bottomline">
+          <div className="note-card__tags">{(note.tags || []).slice(0, 2).map((tag) => <span key={tag}>#{tag}</span>)}</div>
+          {!isTrash && <div className="note-card__actions"><button className="icon-button" aria-label={note.isPinned ? "Unpin note" : "Pin note"} onClick={(event) => { event.preventDefault(); onToggle(note, "isPinned"); }}><Pin size={16} fill={note.isPinned ? "currentColor" : "none"} /></button><button className="icon-button" aria-label={note.isFavorite ? "Remove from favorites" : "Add to favorites"} onClick={(event) => { event.preventDefault(); onToggle(note, "isFavorite"); }}><Heart size={16} fill={note.isFavorite ? "currentColor" : "none"} /></button><button className="icon-button icon-button--danger" aria-label="Move note to trash" onClick={(event) => { event.preventDefault(); onDelete?.(event, note._id); }}><MoreHorizontal size={17} /></button></div>}
+          {isTrash && <div className="note-card__actions"><button className="text-button" onClick={(event) => { event.preventDefault(); onRestore(note._id); }}>Restore</button><button className="icon-button icon-button--danger" aria-label="Permanently delete note" onClick={(event) => { event.preventDefault(); onPermanentDelete?.(note._id); }}><Trash2 size={16} /></button></div>}
         </div>
       </div>
     </Link>

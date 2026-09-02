@@ -5,6 +5,10 @@ import {
   updateNote,
   deleteNote,
   getSelectionById,
+  getTrash,
+  restoreNote,
+  permanentlyDeleteNote,
+  emptyTrash,
 } from "../controllers/notesController.js";
 import ratelimit from "../config/upstash.js";
 
@@ -34,9 +38,13 @@ const rateLimitMiddleware = async (req, res, next) => {
 router.use(rateLimitMiddleware);
 
 router.get("/", getAllNotes);
+router.get("/trash", getTrash);
+router.delete("/trash", emptyTrash);
 router.get("/:id", getSelectionById);
 router.post("/", createNote);
 router.put("/:id", updateNote);
 router.delete("/:id", deleteNote);
+router.post("/:id/restore", restoreNote);
+router.delete("/:id/permanent", permanentlyDeleteNote);
 
 export default router;

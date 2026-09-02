@@ -11,6 +11,7 @@ const NoteDetailPage = () => {
   const [note, setNote] = useState(null);
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
+  const [tags, setTags] = useState("");
 
   const navigate = useNavigate();
   const { id } = useParams();
@@ -20,6 +21,7 @@ const NoteDetailPage = () => {
       try {
         const res = await api.get(`/notes/${id}`);
         setNote(res.data);
+        setTags((res.data.tags || []).join(", "));
       } catch (error) {
         console.log("Error fetching note:", error);
         toast.error("Failed to fetch note");
@@ -58,7 +60,7 @@ if (!note.title.trim() || !note.content.trim()) {
     setSaving(true);
 
     try {
-      await api.put(`/notes/${id}`, { title: note.title, content: note.content });
+      await api.put(`/notes/${id}`, { title: note.title, content: note.content, tags: tags.split(",") });
       toast.success("Note updated successfully");
       navigate("/");
       
@@ -110,6 +112,11 @@ if (!note.title.trim() || !note.content.trim()) {
                   onChange={(e) => setNote({ ...note, title: e.target.value })}
                 />
               </div>
+
+                <div className="form-control mb-4">
+                  <label className="label"><span className="label-text">Tags</span></label>
+                  <input type="text" placeholder="ideas, work, personal" className="input input-bordered" value={tags} onChange={(e) => setTags(e.target.value)} />
+                </div>
 
               <div className="form-control mb-4">
                 <label className="label">

@@ -1,22 +1,22 @@
 import { Link } from "react-router"
-import { PlusIcon } from "lucide-react"
+import { Command, Menu, PlusIcon, Search } from "lucide-react"
 
-const Navbar = () => {
+const Navbar = ({ onSearch, onNewNote, onMenu }) => {
   return (
-    <header className="bg-base-300 border-b border-base-content/10">
-      <div className="mx-auto max-w-6xl p-4">
+    <header className="app-header">
+      <div className="app-header__inner">
+        <button className="mobile-menu icon-button" onClick={onMenu} aria-label="Open navigation"><Menu size={20} /></button>
         <div className="flex items-center justify-between">
 
 
-          <h1 className="text-3xl font-bold text-primary font-mono tracking-tighter">
+          <h1 className="brand-mark">
             HyeBoard
           </h1>
 
 
-          <div className="flex items-center gap-4">
-
-
-            <Link to={"/create"} className="btn btn-primary btn-sm" >
+          <div className="header-actions">
+            <button className="search-trigger" onClick={onSearch}><Search size={17} /><span>Search notes</span><kbd><Command size={12} />K</kbd></button>
+            <Link to={"/create"} onClick={onNewNote} className="primary-button" >
               <PlusIcon className="size-5" />
               <span>New Note</span>
             </Link>

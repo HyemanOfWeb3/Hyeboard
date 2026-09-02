@@ -13,6 +13,7 @@ import api from "../lib/axios";
 const CreatePage = () => {
   const [title, setTitle] = useState("");
   const [content, setContent] = useState("");
+  const [tags, setTags] = useState("");
   const [loading, setLoading] = useState(false);
   const navigate = useNavigate();
 
@@ -26,14 +27,14 @@ const CreatePage = () => {
 
     setLoading(true);
     try {
-      await api.post("/notes", { title, content });
+      await api.post("/notes", { title, content, tags: tags.split(",") });
       toast.success("Note created successfully!");
       navigate("/");
     } catch (error) {
       console.log("Error creating note", error);
       //toast.error("Failed to create note");
 
-      if (error.response.status === 429) {
+      if (error.response?.status === 429) {
         toast.error("Slow down! Chill a lil bit brr", {
           duration: 4000,
           icon: "💀",
@@ -77,6 +78,11 @@ const CreatePage = () => {
                     value={title}
                     onChange={(e) => setTitle(e.target.value)}
                   />
+                </div>
+
+                <div className="form-control mb-4">
+                  <label className="label"><span className="label-text mb-2">Tags</span></label>
+                  <input type="text" placeholder="ideas, work, personal" className="input input-bordered" value={tags} onChange={(e) => setTags(e.target.value)} />
                 </div>
 
                 <div className="form-control mb-4">

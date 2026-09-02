@@ -13,6 +13,22 @@ const noteSchema = new mongoose.Schema(
       type: String,
       required: true,
     },
+    tags: {
+      type: [String],
+      default: [],
+    },
+    isPinned: {
+      type: Boolean,
+      default: false,
+    },
+    isFavorite: {
+      type: Boolean,
+      default: false,
+    },
+    deletedAt: {
+      type: Date,
+      default: null,
+    },
   },
 
   { timestamps: true } // createdAt, updatedAt
