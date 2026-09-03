@@ -2,6 +2,7 @@ import bcrypt from "bcryptjs";
 import User from "../models/User.js";
 import {
   AuthConfigurationError,
+  assertAuthConfigured,
   clearSessionCookie,
   setSessionCookie,
 } from "../middleware/auth.js";
@@ -22,6 +23,7 @@ export async function signup(req, res) {
       .status(400)
       .json({ message: "Password must be at least 8 characters" });
   try {
+    assertAuthConfigured();
     const passwordHash = await bcrypt.hash(password, 12);
     const user = await User.create({ email, passwordHash });
     setSessionCookie(res, user._id);

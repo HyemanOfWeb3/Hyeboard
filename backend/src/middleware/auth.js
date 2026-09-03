@@ -12,8 +12,13 @@ export class AuthConfigurationError extends Error {
 }
 
 function getSecret() {
-  if (!process.env.AUTH_SECRET) throw new AuthConfigurationError();
-  return process.env.AUTH_SECRET;
+  const secret = process.env.AUTH_SECRET || process.env.JWT_SECRET;
+  if (!secret) throw new AuthConfigurationError();
+  return secret;
+}
+
+export function assertAuthConfigured() {
+  getSecret();
 }
 
 export function setSessionCookie(res, userId) {

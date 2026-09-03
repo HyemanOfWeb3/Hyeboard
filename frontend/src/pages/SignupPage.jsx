@@ -22,9 +22,15 @@ const SignupPage = () => {
       setUser(response.data.user);
       navigate("/", { replace: true });
     } catch (requestError) {
+      const status = requestError.response?.status;
       setError(
-        requestError.response?.data?.message ||
-          "Could not create account. Try again.",
+        status === 409
+          ? "An account with this email already exists."
+          : status === 503
+            ? "Sign-up is temporarily unavailable. Please try again later."
+            : status === 400
+              ? requestError.response?.data?.message || "Check your email and password."
+              : "Unable to create your account right now. Please try again.",
       );
     } finally {
       setLoading(false);

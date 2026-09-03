@@ -82,7 +82,8 @@ A full-stack web application for creating, reading, updating, and deleting notes
 
 ### Authentication and migration
 
-Authentication uses an HTTP-only, seven-day cookie signed with `AUTH_SECRET`. The
+Authentication uses an HTTP-only, seven-day cookie signed with `AUTH_SECRET` (or the
+legacy-compatible `JWT_SECRET` name). Configure exactly one of these in Vercel. The
 frontend never receives the token. `GET /api/auth/me` restores the session after a
 refresh, and all note endpoints require that session.
 
