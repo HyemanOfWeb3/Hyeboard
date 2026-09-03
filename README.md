@@ -51,6 +51,8 @@ A full-stack web application for creating, reading, updating, and deleting notes
    Create a `.env` file in the `backend` directory with:
    ```
    MONGO_URI=your_mongodb_connection_string
+   AUTH_SECRET=generate-a-long-random-secret
+   CLIENT_URL=http://localhost:5173
    UPSTASH_REDIS_REST_URL=your_upstash_url
    UPSTASH_REDIS_REST_TOKEN=your_upstash_token
    PORT=5000
@@ -77,6 +79,19 @@ A full-stack web application for creating, reading, updating, and deleting notes
 - `GET /api/notes/:id` - Get a specific note
 - `PUT /api/notes/:id` - Update a note
 - `DELETE /api/notes/:id` - Delete a note
+
+### Authentication and migration
+
+Authentication uses an HTTP-only, seven-day cookie signed with `AUTH_SECRET`. The
+frontend never receives the token. `GET /api/auth/me` restores the session after a
+refresh, and all note endpoints require that session.
+
+The production database was inspected before this change: it contains four legacy
+notes with no owner. They are intentionally preserved but are not made visible to
+new accounts. Do not assign them automatically. For development, the safest option
+is to archive/reset those test records after confirming they are disposable. For
+real data, export the records and perform an explicit owner-approved migration before
+adding each note's `user` reference.
 
 ## Project Structure
 

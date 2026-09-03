@@ -11,6 +11,7 @@ import {
   emptyTrash,
 } from "../controllers/notesController.js";
 import ratelimit from "../config/upstash.js";
+import { requireAuth } from "../middleware/auth.js";
 
 const router = express.Router();
 
@@ -36,6 +37,7 @@ const rateLimitMiddleware = async (req, res, next) => {
 
 // Apply rate limiter to all routes
 router.use(rateLimitMiddleware);
+router.use(requireAuth);
 
 router.get("/", getAllNotes);
 router.get("/trash", getTrash);

@@ -4,7 +4,9 @@ export async function getAllNotes(req, res) {
   // send the notes
   // res.status(200).send("You just fetched the notes");
   try {
-    const notes = await Note.find({ deletedAt: null }).sort({ updatedAt: -1 });
+    const notes = await Note.find({ user: req.user._id, deletedAt: null }).sort(
+      { updatedAt: -1 },
+    );
     res.status(200).json(notes);
   } catch (error) {
     console.error("Error in getAllNotes:", error.message);
@@ -17,7 +19,11 @@ export async function getAllNotes(req, res) {
 export async function getSelectionById(req, res) {
   // find note by id and send it
   try {
-    const findNote = await Note.findOne({ _id: req.params.id, deletedAt: null });
+    const findNote = await Note.findOne({
+      _id: req.params.id,
+      user: req.user._id,
+      deletedAt: null,
+    });
     if (!findNote) return res.status(404).json({ message: "Note not found" });
 
     res.status(200).json(findNote);
@@ -31,7 +37,12 @@ export async function createNote(req, res) {
   // create a new note
   try {
     const { title, content, tags = [] } = req.body;
-    const note = new Note({ title, content, tags: normalizeTags(tags) });
+    const note = new Note({
+      user: req.user._id,
+      title,
+      content,
+      tags: normalizeTags(tags),
+    });
 
     //This will display the status message
     // await newNote.save();
@@ -55,7 +66,7 @@ export async function updateNote(req, res) {
     if (isPinned !== undefined) updates.isPinned = Boolean(isPinned);
     if (isFavorite !== undefined) updates.isFavorite = Boolean(isFavorite);
     const updatedNote = await Note.findByIdAndUpdate(
-      req.params.id,
+      { _id: req.params.id, user: req.user._id },
       updates,
       { new: true, runValidators: true },
     );
@@ -73,7 +84,7 @@ export async function deleteNote(req, res) {
   // delete the note with the given id
   try {
     const deletedNote = await Note.findOneAndUpdate(
-      { _id: req.params.id, deletedAt: null },
+      { _id: req.params.id, user: req.user._id, deletedAt: null },
       { deletedAt: new Date() },
       { new: true },
     );
@@ -89,7 +100,10 @@ export async function deleteNote(req, res) {
 
 export async function getTrash(req, res) {
   try {
-    const notes = await Note.find({ deletedAt: { $ne: null } }).sort({ deletedAt: -1 });
+    const notes = await Note.find({
+      user: req.user._id,
+      deletedAt: { $ne: null },
+    }).sort({ deletedAt: -1 });
     res.status(200).json(notes);
   } catch (error) {
     console.error("Error in getTrash:", error.message);
@@ -100,7 +114,7 @@ export async function getTrash(req, res) {
 export async function restoreNote(req, res) {
   try {
     const note = await Note.findByIdAndUpdate(
-      req.params.id,
+      { _id: req.params.id, user: req.user._id },
       { deletedAt: null },
       { new: true },
     );
@@ -114,8 +128,13 @@ export async function restoreNote(req, res) {
 
 export async function permanentlyDeleteNote(req, res) {
   try {
-    const note = await Note.findOneAndDelete({ _id: req.params.id, deletedAt: { $ne: null } });
-    if (!note) return res.status(404).json({ message: "Trashed note not found" });
+    const note = await Note.findOneAndDelete({
+      _id: req.params.id,
+      user: req.user._id,
+      deletedAt: { $ne: null },
+    });
+    if (!note)
+      return res.status(404).json({ message: "Trashed note not found" });
     res.status(200).json({ message: "Note permanently deleted" });
   } catch (error) {
     console.error("Error in permanentlyDeleteNote:", error.message);
@@ -125,7 +144,7 @@ export async function permanentlyDeleteNote(req, res) {
 
 export async function emptyTrash(req, res) {
   try {
-    await Note.deleteMany({ deletedAt: { $ne: null } });
+    await Note.deleteMany({ user: req.user._id, deletedAt: { $ne: null } });
     res.status(200).json({ message: "Trash emptied" });
   } catch (error) {
     console.error("Error in emptyTrash:", error.message);
@@ -135,8 +154,12 @@ export async function emptyTrash(req, res) {
 
 function normalizeTags(tags) {
   if (!Array.isArray(tags)) return [];
-  return [...new Set(tags
-    .filter((tag) => typeof tag === "string")
-    .map((tag) => tag.trim().replace(/^#/, "").toLowerCase())
-    .filter(Boolean))].slice(0, 10);
+  return [
+    ...new Set(
+      tags
+        .filter((tag) => typeof tag === "string")
+        .map((tag) => tag.trim().replace(/^#/, "").toLowerCase())
+        .filter(Boolean),
+    ),
+  ].slice(0, 10);
 }

@@ -1,8 +1,10 @@
 import express from "express";
 import cors from "cors";
 import notesRoutes from "./routes/notesRoutes.js";
+import authRoutes from "./routes/authRoutes.js";
 import { connectDB } from "./config/db.js";
 import rateLimiter from "./middleware/rateLimiter.js";
+import cookieParser from "cookie-parser";
 
 const app = express();
 
@@ -16,6 +18,7 @@ app.use(
   }),
 );
 app.use(express.json());
+app.use(cookieParser());
 
 let dbConnected = false;
 let dbConnectionError = null;
@@ -34,10 +37,7 @@ app.use((req, res, next) => {
       })
       .catch((error) => {
         dbConnectionError = error.message;
-        res.status(500).json({
-          error: "Database connection failed",
-          details: error.message,
-        });
+        res.status(500).json({ message: "Database connection failed" });
       });
   } else {
     next();
@@ -45,6 +45,7 @@ app.use((req, res, next) => {
 });
 
 app.use(rateLimiter);
+app.use("/api/auth", authRoutes);
 app.use("/api/notes", notesRoutes);
 
 app.get("/api/health", (req, res) => {
