@@ -4,9 +4,15 @@ import User from "../models/User.js";
 export const SESSION_COOKIE = "hyeboard_session";
 const SESSION_MAX_AGE = 7 * 24 * 60 * 60 * 1000;
 
+export class AuthConfigurationError extends Error {
+  constructor() {
+    super("AUTH_SECRET is not configured");
+    this.code = "AUTH_CONFIGURATION_MISSING";
+  }
+}
+
 function getSecret() {
-  if (!process.env.AUTH_SECRET)
-    throw new Error("AUTH_SECRET is not configured");
+  if (!process.env.AUTH_SECRET) throw new AuthConfigurationError();
   return process.env.AUTH_SECRET;
 }
 

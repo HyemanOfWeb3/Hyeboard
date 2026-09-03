@@ -22,8 +22,13 @@ const LoginPage = () => {
       setUser(response.data.user);
       navigate(location.state?.from || "/", { replace: true });
     } catch (requestError) {
+      const status = requestError.response?.status;
       setError(
-        requestError.response?.data?.message || "Could not log in. Try again.",
+        status === 401
+          ? "Invalid email or password."
+          : status === 503
+            ? "Sign-in is temporarily unavailable. Please try again later."
+            : "Unable to sign in right now. Please try again.",
       );
     } finally {
       setLoading(false);

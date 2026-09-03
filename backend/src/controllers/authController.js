@@ -1,6 +1,10 @@
 import bcrypt from "bcryptjs";
 import User from "../models/User.js";
-import { clearSessionCookie, setSessionCookie } from "../middleware/auth.js";
+import {
+  AuthConfigurationError,
+  clearSessionCookie,
+  setSessionCookie,
+} from "../middleware/auth.js";
 
 const publicUser = (user) => ({ id: user._id, email: user.email });
 
@@ -23,6 +27,10 @@ export async function signup(req, res) {
     setSessionCookie(res, user._id);
     res.status(201).json({ user: publicUser(user) });
   } catch (error) {
+    if (error instanceof AuthConfigurationError)
+      return res
+        .status(503)
+        .json({ message: "Authentication service is not configured" });
     if (error?.code === 11000)
       return res
         .status(409)
@@ -43,13 +51,17 @@ export async function login(req, res) {
     return res.status(400).json({ message: "Email and password are required" });
   try {
     const user = await User.findOne({ email }).select("+passwordHash");
-    if (!user || !(await bcrypt.compare(password, user.passwordHash)))
-      return res.status(401).json({ message: "Incorrect email or password" });
+    if (!user || !(await bcrypt.compare(password, user.passwordHash || "")))
+      return res.status(401).json({ message: "Invalid email or password" });
     setSessionCookie(res, user._id);
     res.status(200).json({ user: publicUser(user) });
   } catch (error) {
+    if (error instanceof AuthConfigurationError)
+      return res
+        .status(503)
+        .json({ message: "Authentication service is not configured" });
     console.error("Login failed:", error.message);
-    res.status(500).json({ message: "Could not log in" });
+    res.status(500).json({ message: "Unable to sign in right now" });
   }
 }
 
