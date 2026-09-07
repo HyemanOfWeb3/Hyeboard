@@ -3,10 +3,12 @@ import { ArrowLeft, FilePlus2 } from "lucide-react";
 import { useNavigate } from "react-router";
 import { toast } from "react-hot-toast";
 import NoteEditor from "../components/NoteEditor";
-import api from "../lib/axios";
+import { useAuth } from "../lib/useAuth";
+import { createNoteLocally } from "../lib/noteMutations";
 
 const CreatePage = () => {
   const navigate = useNavigate();
+  const { user } = useAuth();
   const [title, setTitle] = useState("");
   const [content, setContent] = useState("");
   const [tags, setTags] = useState("");
@@ -35,9 +37,16 @@ const CreatePage = () => {
     event.preventDefault();
     if (!title.trim() || !content.trim()) { toast.error("Add a title and some content first"); return; }
     setLoading(true);
-    try { await api.post("/notes", { title: title.trim(), content, tags: tags.split(",") }); toast.success("Note created"); navigate("/"); }
-    catch (error) { toast.error(error.response?.status === 429 ? "Too many requests. Try again shortly." : "Could not create note"); }
-    finally { setLoading(false); }
+    const userId = user?.id || user?._id;
+    const normalizedTags = tags.split(",").map((tag) => tag.trim()).filter(Boolean);
+
+    try {
+      await createNoteLocally(userId, { title: title.trim(), content, tags: normalizedTags });
+      toast.success(navigator.onLine ? "Note queued for sync" : "Saved locally while offline", { duration: 1800 });
+      navigate("/");
+    } catch {
+      toast.error("Could not save this note locally");
+    } finally { setLoading(false); }
   };
 
   return <div className={`editor-page ${focusMode ? "editor-page--focus" : ""}`}>

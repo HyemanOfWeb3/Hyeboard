@@ -2,6 +2,7 @@ import { useState } from "react";
 import { Link, useNavigate } from "react-router";
 import api from "../lib/axios";
 import { useAuth } from "../lib/useAuth";
+import { setStoredUserId } from "../lib/localNotesStore";
 import { AuthPage } from "./LoginPage";
 
 const SignupPage = () => {
@@ -19,7 +20,12 @@ const SignupPage = () => {
     setLoading(true);
     try {
       const response = await api.post("/auth/signup", { email, password });
-      setUser(response.data.user);
+      const nextUser = response.data.user;
+      setUser(nextUser);
+      const nextUserId = nextUser?.id || nextUser?._id;
+      if (nextUserId) {
+        setStoredUserId(nextUserId);
+      }
       navigate("/", { replace: true });
     } catch (requestError) {
       const status = requestError.response?.status;
@@ -29,7 +35,8 @@ const SignupPage = () => {
           : status === 503
             ? "Sign-up is temporarily unavailable. Please try again later."
             : status === 400
-              ? requestError.response?.data?.message || "Check your email and password."
+              ? requestError.response?.data?.message ||
+                "Check your email and password."
               : "Unable to create your account right now. Please try again.",
       );
     } finally {

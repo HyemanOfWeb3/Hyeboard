@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useNavigate } from "react-router";
 import { Filter, RefreshCw, Search, SlidersHorizontal, X } from "lucide-react";
 import { toast } from "react-hot-toast";
@@ -9,9 +9,21 @@ import NoteCard from "../components/NoteCard";
 import NotesNotFound from "../components/NotesNotFound";
 import RateLimitedUI from "../components/RateLimitedUI";
 import api from "../lib/axios";
+import { useAuth } from "../lib/useAuth";
+import {
+  restoreNoteLocally,
+  trashNoteLocally,
+  updateNoteLocally,
+} from "../lib/noteMutations";
+import {
+  getLocalNotesForUser,
+  mergeServerWithLocal,
+  persistLocalNotesForUser,
+} from "../lib/localNotesStore";
 
 const HomePage = () => {
   const navigate = useNavigate();
+  const { user } = useAuth();
   const [notes, setNotes] = useState([]);
   const [trash, setTrash] = useState([]);
   const [activeView, setActiveView] = useState("all");
@@ -24,23 +36,62 @@ const HomePage = () => {
   const [collapsed, setCollapsed] = useState(false);
   const [mobileOpen, setMobileOpen] = useState(false);
   const [paletteOpen, setPaletteOpen] = useState(false);
+  const activeUserIdRef = useRef(null);
 
-  const fetchNotes = async () => {
+  const fetchNotes = useCallback(async () => {
+    const userId = user?.id || user?._id;
+    if (!userId) {
+      setLoading(false);
+      return;
+    }
+
     setLoading(true);
+
+    let cachedState = { notes: [], trash: [] };
+    try {
+      cachedState = await getLocalNotesForUser(userId);
+      if (activeUserIdRef.current !== userId) return;
+      if (cachedState.notes.length || cachedState.trash.length) {
+        setNotes(cachedState.notes);
+        setTrash(cachedState.trash);
+      }
+    } catch {
+      cachedState = { notes: [], trash: [] };
+    }
+
     try {
       const [notesResponse, trashResponse] = await Promise.all([api.get("/notes"), api.get("/notes/trash")]);
-      setNotes(Array.isArray(notesResponse.data) ? notesResponse.data : []);
-      setTrash(Array.isArray(trashResponse.data) ? trashResponse.data : []);
+      const serverNotes = Array.isArray(notesResponse.data) ? notesResponse.data : [];
+      const serverTrash = Array.isArray(trashResponse.data) ? trashResponse.data : [];
+      if (activeUserIdRef.current !== userId) return;
+      const mergedNotes = mergeServerWithLocal(cachedState.notes, serverNotes);
+      const mergedTrash = mergeServerWithLocal(cachedState.trash, serverTrash);
+
+      setNotes(mergedNotes);
+      setTrash(mergedTrash);
+      await persistLocalNotesForUser(userId, mergedNotes, mergedTrash);
       setError("");
       setRateLimited(false);
     } catch (requestError) {
       const message = requestError.response?.data?.error || requestError.response?.data?.message || requestError.message || "Something went wrong";
-      setError(message);
+      setError(window.navigator.onLine ? message : "You're offline. Showing the latest cached notes for this account.");
       setRateLimited(requestError.response?.status === 429);
+      if (!window.navigator.onLine && (!cachedState.notes.length && !cachedState.trash.length)) {
+        setNotes([]);
+        setTrash([]);
+      }
     } finally { setLoading(false); }
-  };
+  }, [user]);
 
-  useEffect(() => { fetchNotes(); }, []);
+  useEffect(() => {
+    const userId = user?.id || user?._id || null;
+    activeUserIdRef.current = userId;
+    setNotes([]);
+    setTrash([]);
+    if (user) {
+      fetchNotes();
+    }
+  }, [fetchNotes, user]);
   useEffect(() => { const timer = window.setTimeout(() => setDebouncedSearch(search.trim().toLowerCase()), 220); return () => window.clearTimeout(timer); }, [search]);
   useEffect(() => {
     const onKeyDown = (event) => {
@@ -76,18 +127,35 @@ const HomePage = () => {
   }, [activeView, debouncedSearch, notes, sort, trash]);
 
   const updateNote = async (note, field) => {
+    const userId = user?.id || user?._id;
     try {
-      const response = await api.put(`/notes/${note._id}`, { [field]: !note[field] });
-      setNotes((current) => current.map((item) => item._id === note._id ? response.data : item));
+      const result = await updateNoteLocally(userId, note, { [field]: !note[field] });
+      setNotes(result.scope.notes);
       toast.success(field === "isPinned" ? (note[field] ? "Note unpinned" : "Note pinned") : (note[field] ? "Removed from favorites" : "Added to favorites"), { duration: 1800 });
-    } catch { toast.error("Could not update note"); }
+    } catch { toast.error("Could not save this change locally"); }
   };
 
   const moveToTrash = async (event, id) => {
     if (!window.confirm("Move this note to trash?")) return;
-    try { await api.delete(`/notes/${id}`); setNotes((current) => current.filter((note) => note._id !== id)); toast.success("Moved to trash"); } catch { toast.error("Could not move note to trash"); }
+    const userId = user?.id || user?._id;
+    const note = notes.find((item) => item._id === id);
+    try {
+      const result = await trashNoteLocally(userId, note);
+      setNotes(result.scope.notes);
+      setTrash(result.scope.trash);
+      toast.success(navigator.onLine ? "Moved to trash · syncing" : "Moved to trash locally");
+    } catch { toast.error("Could not save this change locally"); }
   };
-  const restoreNote = async (id) => { try { await api.post(`/notes/${id}/restore`); setTrash((current) => current.filter((note) => note._id !== id)); toast.success("Note restored"); } catch { toast.error("Could not restore note"); } };
+  const restoreNote = async (id) => {
+    const userId = user?.id || user?._id;
+    const note = trash.find((item) => item._id === id);
+    try {
+      const result = await restoreNoteLocally(userId, note);
+      setNotes(result.scope.notes);
+      setTrash(result.scope.trash);
+      toast.success(navigator.onLine ? "Note restored · syncing" : "Note restored locally");
+    } catch { toast.error("Could not save this change locally"); }
+  };
   const permanentlyDelete = async (id) => { if (!window.confirm("Permanently delete this note?")) return; try { await api.delete(`/notes/${id}/permanent`); setTrash((current) => current.filter((note) => note._id !== id)); toast.success("Note permanently deleted"); } catch { toast.error("Could not delete note"); } };
   const command = (id) => { setPaletteOpen(false); if (id === "create") navigate("/create"); else if (id === "sidebar") setCollapsed((value) => !value); else setActiveView(id); };
   const title = activeView === "all" ? "Your notes" : activeView.startsWith("tag:") ? `#${activeView.slice(4)}` : activeView[0].toUpperCase() + activeView.slice(1);

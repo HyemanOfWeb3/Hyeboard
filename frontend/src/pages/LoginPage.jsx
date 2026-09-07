@@ -2,6 +2,7 @@ import { useState } from "react";
 import { Link, useLocation, useNavigate } from "react-router";
 import api from "../lib/axios";
 import { useAuth } from "../lib/useAuth";
+import { setStoredUserId } from "../lib/localNotesStore";
 
 const LoginPage = () => {
   const navigate = useNavigate();
@@ -19,7 +20,12 @@ const LoginPage = () => {
     setLoading(true);
     try {
       const response = await api.post("/auth/login", { email, password });
-      setUser(response.data.user);
+      const nextUser = response.data.user;
+      setUser(nextUser);
+      const nextUserId = nextUser?.id || nextUser?._id;
+      if (nextUserId) {
+        setStoredUserId(nextUserId);
+      }
       navigate(location.state?.from || "/", { replace: true });
     } catch (requestError) {
       const status = requestError.response?.status;

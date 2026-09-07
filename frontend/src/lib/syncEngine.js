@@ -1,0 +1,236 @@
+import api from "./axios";
+import {
+  deleteOperation,
+  enqueueOperation,
+  getOperationsForUser,
+  replaceLocalNoteIdForUser,
+  setSyncMeta,
+  updateOperation,
+  upsertLocalNoteForUser,
+} from "./localNotesStore";
+
+const MAX_ATTEMPTS = 8;
+const BASE_RETRY_MS = 1500;
+let activeUserId = null;
+let running = false;
+let fallbackLock = false;
+let sequence = 0;
+let snapshot = { status: "idle", userId: null, pending: 0, error: null };
+const subscribers = new Set();
+const channel = typeof BroadcastChannel !== "undefined" ? new BroadcastChannel("hyeboard-sync") : null;
+
+function publish(next) {
+  snapshot = { ...snapshot, ...next };
+  subscribers.forEach((listener) => listener(snapshot));
+}
+
+function isRetryable(error) {
+  const status = error.response?.status;
+  return !status || status === 408 || status === 429 || status >= 500;
+}
+
+function retryDelay(attempts) {
+  return Math.min(60_000, BASE_RETRY_MS * 2 ** Math.max(0, attempts - 1));
+}
+
+function isActive(userId, currentSequence) {
+  return activeUserId === userId && sequence === currentSequence;
+}
+
+async function request(operation) {
+  const data = {
+    ...operation.payload,
+    operationId: operation.operationId,
+    baseRevision: operation.baseRevision,
+  };
+  if (operation.type === "CREATE_NOTE") {
+    return api.post("/notes", data, { skipAuthRedirect: true });
+  }
+  if (operation.type === "UPDATE_NOTE") {
+    return api.put(`/notes/${operation.noteId}`, data, { skipAuthRedirect: true });
+  }
+  if (operation.type === "DELETE_NOTE") {
+    return api.delete(`/notes/${operation.noteId}`, {
+      data,
+      skipAuthRedirect: true,
+    });
+  }
+  if (operation.type === "RESTORE_NOTE") {
+    return api.post(`/notes/${operation.noteId}/restore`, data, {
+      skipAuthRedirect: true,
+    });
+  }
+  throw new Error(`Unsupported sync operation: ${operation.type}`);
+}
+
+async function applySuccessfulOperation(userId, operation, response) {
+  const serverNote = response.data;
+  if (!serverNote || !serverNote._id) return;
+  if (operation.type === "CREATE_NOTE") {
+    await replaceLocalNoteIdForUser(userId, operation.noteId, serverNote);
+  } else {
+    await upsertLocalNoteForUser(userId, serverNote);
+  }
+  await deleteOperation(operation.operationId);
+  await setSyncMeta(userId, { lastSuccessfulSyncAt: new Date().toISOString() });
+  channel?.postMessage({ type: "notes-changed", userId });
+}
+
+async function processOperation(userId, operation, currentSequence) {
+  if (!isActive(userId, currentSequence)) return;
+  const syncing = {
+    ...operation,
+    status: "syncing",
+    attempts: operation.attempts + 1,
+    lastError: null,
+  };
+  await updateOperation(syncing);
+
+  try {
+    const response = await request(syncing);
+    await applySuccessfulOperation(userId, syncing, response);
+  } catch (error) {
+    const status = error.response?.status;
+    if (status === 401) {
+      await updateOperation({ ...syncing, status: "pending", nextAttemptAt: new Date().toISOString(), lastError: "Authentication required" });
+      publish({ status: "auth-required", error: "Authentication required" });
+      return;
+    }
+    if (status === 409 && error.response?.data?.code === "SYNC_OPERATION_IN_PROGRESS") {
+      await updateOperation({
+        ...syncing,
+        status: "pending",
+        nextAttemptAt: new Date(Date.now() + retryDelay(syncing.attempts)).toISOString(),
+        lastError: error.response.data.message,
+      });
+      publish({ status: "error", error: error.response.data.message });
+      return;
+    }
+    if (status === 409 && error.response?.data?.code === "REVISION_CONFLICT") {
+      await updateOperation({
+        ...syncing,
+        status: "conflict",
+        lastError: error.response.data.message || "The note changed elsewhere",
+        serverNote: error.response.data.serverNote || null,
+      });
+      publish({ status: "conflict", error: "A note needs your attention" });
+      return;
+    }
+
+    const retry = isRetryable(error) && syncing.attempts < MAX_ATTEMPTS;
+    await updateOperation({
+      ...syncing,
+      status: retry ? "pending" : "failed",
+      nextAttemptAt: new Date(Date.now() + (retry ? retryDelay(syncing.attempts) : 0)).toISOString(),
+      lastError: error.response?.data?.message || error.message || "Sync failed",
+    });
+    publish({ status: retry ? "error" : "error", error: error.message || "Sync failed" });
+  }
+}
+
+async function flushWithoutLock(userId, currentSequence) {
+  if (running || !isActive(userId, currentSequence)) return;
+  running = true;
+  try {
+    const operations = await getOperationsForUser(userId);
+    const ready = operations.filter(
+      (operation) =>
+        operation.status === "pending" &&
+        new Date(operation.nextAttemptAt || 0).getTime() <= Date.now(),
+    );
+    publish({ status: ready.length ? "syncing" : "synced", pending: ready.length, error: null });
+    for (const operation of ready) {
+      if (!isActive(userId, currentSequence)) break;
+      await processOperation(userId, operation, currentSequence);
+    }
+    const remaining = await getOperationsForUser(userId);
+    const hasPending = remaining.some((operation) => ["pending", "syncing"].includes(operation.status));
+    const hasConflict = remaining.some((operation) => operation.status === "conflict");
+    publish({
+      status: hasConflict ? "conflict" : hasPending ? "error" : "synced",
+      pending: remaining.filter((operation) => operation.status !== "synced").length,
+    });
+  } finally {
+    running = false;
+  }
+}
+
+async function flushUserQueue(userId) {
+  const currentSequence = sequence;
+  if (navigator.locks?.request) {
+    await navigator.locks.request(
+      `hyeboard-sync:${userId}`,
+      { ifAvailable: true },
+      async (lock) => {
+        if (lock) await flushWithoutLock(userId, currentSequence);
+      },
+    );
+    return;
+  }
+  if (fallbackLock) return;
+  fallbackLock = true;
+  try {
+    await flushWithoutLock(userId, currentSequence);
+  } finally {
+    fallbackLock = false;
+  }
+}
+
+export function requestSync(userId) {
+  const normalized = String(userId || "").trim();
+  if (!normalized || normalized !== activeUserId || !navigator.onLine) return;
+  void flushUserQueue(normalized);
+}
+
+export function startSyncForUser(userId) {
+  const normalized = String(userId || "").trim();
+  if (!normalized) return;
+  activeUserId = normalized;
+  sequence += 1;
+  publish({ userId: normalized, status: navigator.onLine ? "idle" : "offline", error: null });
+  requestSync(normalized);
+}
+
+export function stopSyncForUser(userId) {
+  if (!userId || activeUserId !== String(userId)) return;
+  activeUserId = null;
+  sequence += 1;
+  publish({ userId: null, status: "idle", pending: 0, error: null });
+}
+
+export function subscribeSync(listener) {
+  subscribers.add(listener);
+  return () => subscribers.delete(listener);
+}
+
+export function getSyncSnapshot() {
+  return snapshot;
+}
+
+window.addEventListener("online", () => {
+  if (activeUserId) {
+    publish({ status: "syncing", error: null });
+    requestSync(activeUserId);
+  }
+});
+window.addEventListener("offline", () => publish({ status: "offline" }));
+window.addEventListener("focus", () => activeUserId && requestSync(activeUserId));
+channel?.addEventListener("message", (event) => {
+  if (event.data?.type === "sync-request" && event.data.userId === activeUserId) requestSync(activeUserId);
+});
+
+export async function retryFailedOperations(userId) {
+  const operations = await getOperationsForUser(userId);
+  await Promise.all(
+    operations
+      .filter((operation) => operation.status === "failed")
+      .map((operation) => updateOperation({ ...operation, status: "pending", nextAttemptAt: new Date().toISOString() })),
+  );
+  requestSync(userId);
+}
+
+export async function enqueueAndSync(userId, operation) {
+  const queued = await enqueueOperation(userId, operation);
+  requestSync(userId);
+  return queued;
+}

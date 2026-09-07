@@ -1,3 +1,58 @@
+.status-banner {
+  position: fixed;
+  right: 20px;
+  bottom: 18px;
+  z-index: 70;
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  max-width: min(360px, calc(100vw - 32px));
+  padding: 10px 14px;
+  border: 1px solid var(--border);
+  border-radius: 12px;
+  background: rgba(17, 24, 20, 0.94);
+  box-shadow: 0 18px 42px rgba(0, 0, 0, 0.26);
+  color: var(--text);
+  font-size: 12px;
+  backdrop-filter: blur(12px);
+}
+
+.status-banner__content {
+  display: grid;
+  gap: 2px;
+}
+
+.status-banner__content strong,
+.status-banner > span,
+.status-banner > strong {
+  font-size: 12px;
+  font-weight: 700;
+}
+
+.status-banner small {
+  color: var(--muted);
+  font-size: 11px;
+}
+
+.status-banner--offline {
+  border-color: rgba(255, 142, 135, 0.38);
+  color: var(--danger);
+}
+
+.status-banner--reconnecting,
+.status-banner--update,
+.status-banner--install,
+.status-banner--online,
+.status-banner--ready {
+  color: var(--accent-strong);
+}
+
+.inline-text-button {
+  margin-left: 6px;
+  padding: 0;
+  font-size: 12px;
+}
+
 @tailwind base;
 @tailwind components;
 @tailwind utilities;

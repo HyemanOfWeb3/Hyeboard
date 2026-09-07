@@ -35,9 +35,23 @@ const noteSchema = new mongoose.Schema(
       type: Date,
       default: null,
     },
+    revision: {
+      type: Number,
+      default: 1,
+      min: 1,
+    },
+    clientNoteId: {
+      type: String,
+      default: null,
+    },
   },
 
   { timestamps: true }, // createdAt, updatedAt
+);
+
+noteSchema.index(
+  { user: 1, clientNoteId: 1 },
+  { unique: true, partialFilterExpression: { clientNoteId: { $type: "string" } } },
 );
 
 const Note = mongoose.model("Note", noteSchema);
