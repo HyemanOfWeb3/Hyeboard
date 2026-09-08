@@ -21,6 +21,7 @@ import NoteLinkPreview from "../components/NoteLinkPreview";
 import CommandPalette from "../components/CommandPalette";
 import VersionHistory from "../components/VersionHistory";
 import AttachmentPanel from "../components/AttachmentPanel";
+import AIInsightsPanel from "../components/AIInsightsPanel";
 import api from "../lib/axios";
 import { useAuth } from "../lib/useAuth";
 import { getLocalNotesForUser } from "../lib/localNotesStore";
@@ -371,6 +372,7 @@ const NoteDetailPage = () => {
             userId={user?.id || user?._id}
           />
           <AttachmentPanel noteId={note._id || note.id || note.clientNoteId} />
+          <AIInsightsPanel noteId={note._id || note.id || note.clientNoteId} />
           <footer className="editor-footer">
             <button className="delete-button" onClick={deleteNote}>
               <Trash2 size={16} /> Move to trash

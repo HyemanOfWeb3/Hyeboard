@@ -32,3 +32,21 @@ npm run test:e2e
 Tests that require credentials are reported as skipped when the isolated test
 environment is not configured. The mobile login/overflow smoke test remains
 available without credentials.
+
+## AI evaluation
+
+The default backend test command runs deterministic provider mocks, prompt-injection
+boundary checks, no-key behavior, and the lexical retrieval evaluation dataset.
+The retrieval baseline currently measures exact/title/tag queries and verifies that
+deleted notes do not leak. Real provider tests are opt-in and must use a restricted
+disposable key:
+
+```powershell
+$env:AI_INTEGRATION = "true"
+$env:AI_API_KEY = "test-only-provider-key"
+npm test --prefix backend
+```
+
+Never place `AI_API_KEY` in this file, source code, browser variables, or committed
+environment files. Provider integration tests assert response schemas and source
+IDs rather than exact generated wording.

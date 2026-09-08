@@ -63,6 +63,11 @@ A full-stack web application for creating, reading, updating, and deleting notes
    # Optional for non-AWS S3-compatible providers
    S3_ENDPOINT=https://your-storage-endpoint
    S3_FORCE_PATH_STYLE=false
+   # Optional server-side AI provider configuration
+   AI_API_KEY=server_only_provider_key
+   AI_API_URL=https://api.openai.com/v1/chat/completions
+   AI_MODEL=gpt-4o-mini
+   AI_TIMEOUT_MS=15000
    PORT=5000
    ```
 
@@ -98,6 +103,20 @@ short-lived signed URLs and requires ownership of the note. Trashed notes retain
 their attachments until permanent deletion; emptying trash removes their objects.
 Attachment binaries are independent assets: note version restores do not roll them
 back, and Markdown/JSON note exports explicitly exclude binary content.
+
+### Optional AI insights
+
+AI actions are explicit and note-scoped: summarize, key points, suggested tags, and
+possible related existing notes. The browser never receives `AI_API_KEY`. When an
+action runs, only the selected note's title, tags, and up to 12,000 characters of
+content are sent to the configured provider. Related-note analysis sends at most 20
+same-user candidate titles, tags, and short excerpts using opaque candidate labels.
+HyeBoard does not persist prompts or provider responses; a short in-memory cache is
+used only to prevent duplicate requests on one server instance. Note content is
+treated as untrusted data, and AI suggestions never create links or edit tags
+automatically. AI is limited to five requests per user per five minutes, is
+unavailable offline, and the rest of the note app continues to work when no
+provider key is configured.
 
 ### Authentication and migration
 

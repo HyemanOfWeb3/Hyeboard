@@ -5,12 +5,13 @@ import {
   Menu,
   PlusIcon,
   Search,
+  Brain,
   UserRound,
 } from "lucide-react";
 import { useState } from "react";
 import { useAuth } from "../lib/useAuth";
 
-const Navbar = ({ onSearch, onNewNote, onMenu }) => {
+const Navbar = ({ onSearch, onNewNote, onMenu, onAssistant }) => {
   const { user, logout } = useAuth();
   const [open, setOpen] = useState(false);
   return (
@@ -33,6 +34,9 @@ const Navbar = ({ onSearch, onNewNote, onMenu }) => {
               <kbd>
                 <Command size={12} />K
               </kbd>
+            </button>
+            <button className="icon-button" onClick={onAssistant} aria-label="Open knowledge assistant" title="Ask your notes">
+              <Brain size={18} />
             </button>
             <Link to={"/create"} onClick={onNewNote} className="primary-button">
               <PlusIcon className="size-5" />

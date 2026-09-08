@@ -6,7 +6,7 @@
   "scripts": {
     "dev": "nodemon src/server.js",
     "start": "node src/server.js",
-    "test": "node --test ./tests/api.security.test.js"
+    "test": "node --test ./tests/api.security.test.js ./tests/ai.service.test.js ./tests/retrieval.evaluation.test.js ./tests/ai.provider.integration.test.js"
   },
   "type": "module",
   "keywords": [],

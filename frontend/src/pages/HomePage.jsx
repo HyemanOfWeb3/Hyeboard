@@ -6,6 +6,7 @@ import Navbar from "../components/Navbar";
 import Sidebar from "../components/Sidebar";
 import CommandPalette from "../components/CommandPalette";
 import ImportExportPanel from "../components/ImportExportPanel";
+import KnowledgeAssistant from "../components/KnowledgeAssistant";
 import NoteCard from "../components/NoteCard";
 import NotesNotFound from "../components/NotesNotFound";
 import RateLimitedUI from "../components/RateLimitedUI";
@@ -39,6 +40,7 @@ const HomePage = () => {
   const [collapsed, setCollapsed] = useState(false);
   const [mobileOpen, setMobileOpen] = useState(false);
   const [paletteOpen, setPaletteOpen] = useState(false);
+  const [assistantOpen, setAssistantOpen] = useState(false);
   const activeUserIdRef = useRef(null);
 
   const fetchNotes = useCallback(async () => {
@@ -323,6 +325,7 @@ const HomePage = () => {
       <Navbar
         onSearch={() => setPaletteOpen(true)}
         onMenu={() => setMobileOpen(true)}
+        onAssistant={() => setAssistantOpen(true)}
       />
       <div className={`workspace ${collapsed ? "workspace--collapsed" : ""}`}>
         <div
@@ -451,6 +454,7 @@ const HomePage = () => {
         onClose={() => setPaletteOpen(false)}
         onCommand={command}
       />
+      <KnowledgeAssistant open={assistantOpen} onClose={() => setAssistantOpen(false)} />
     </div>
   );
 };
