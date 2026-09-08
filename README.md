@@ -55,6 +55,14 @@ A full-stack web application for creating, reading, updating, and deleting notes
    CLIENT_URL=http://localhost:5173
    UPSTASH_REDIS_REST_URL=your_upstash_url
    UPSTASH_REDIS_REST_TOKEN=your_upstash_token
+   # S3-compatible object storage for note attachments
+   S3_REGION=your_storage_region
+   S3_ACCESS_KEY_ID=your_storage_access_key
+   S3_SECRET_ACCESS_KEY=your_storage_secret_key
+   S3_BUCKET=your_private_bucket_name
+   # Optional for non-AWS S3-compatible providers
+   S3_ENDPOINT=https://your-storage-endpoint
+   S3_FORCE_PATH_STYLE=false
    PORT=5000
    ```
 
@@ -80,12 +88,28 @@ A full-stack web application for creating, reading, updating, and deleting notes
 - `PUT /api/notes/:id` - Update a note
 - `DELETE /api/notes/:id` - Delete a note
 
+### Attachments
+
+Attachments use private S3-compatible object storage and are never stored in MongoDB
+or the Vercel filesystem. The server accepts images (`jpeg`, `png`, `gif`, `webp`),
+PDFs, and plain text formats up to 4 MB, with a maximum of 10 attachments per note.
+Upload bytes are checked against their declared type before storage. Access uses
+short-lived signed URLs and requires ownership of the note. Trashed notes retain
+their attachments until permanent deletion; emptying trash removes their objects.
+Attachment binaries are independent assets: note version restores do not roll them
+back, and Markdown/JSON note exports explicitly exclude binary content.
+
 ### Authentication and migration
 
 Authentication uses an HTTP-only, seven-day cookie signed with `AUTH_SECRET` (or the
 legacy-compatible `JWT_SECRET` name). Configure exactly one of these in Vercel. The
 frontend never receives the token. `GET /api/auth/me` restores the session after a
 refresh, and all note endpoints require that session.
+
+Keep deployment credentials out of source control and rotate any credential that
+has been exposed outside the deployment secret store. The hardening tests use only
+the `TEST_*` variables documented in `tests/README.md`; they never fall back to
+production `MONGO_URI`, auth secrets, or storage credentials.
 
 The production database was inspected before this change: it contains four legacy
 notes with no owner. They are intentionally preserved but are not made visible to

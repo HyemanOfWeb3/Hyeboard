@@ -4,11 +4,18 @@ import dotenv from "dotenv";
 // Load environment variables from ../.env (if present)
 dotenv.config();
 
-const MONGO_URI = process.env.MONGO_URI;
+const MONGO_URI =
+  process.env.NODE_ENV === "test"
+    ? process.env.TEST_MONGO_URI
+    : process.env.MONGO_URI;
 
 // In production, MONGO_URI is required
 if (!MONGO_URI) {
-  console.warn("⚠️  MONGO_URI environment variable is not set!");
+  console.warn(
+    process.env.NODE_ENV === "test"
+      ? "TEST_MONGO_URI environment variable is not set!"
+      : "MONGO_URI environment variable is not set!",
+  );
   console.warn(
     "Set MONGO_URI in your environment variables for database connectivity"
   );

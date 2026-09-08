@@ -1,19 +1,22 @@
 import { createElement, useEffect, useState } from "react";
-import { Command, FilePlus2, Heart, LayoutGrid, PanelLeft, Pin, Search, Settings, Trash2 } from "lucide-react";
+import { Command, FilePlus2, Heart, LayoutGrid, Network, PanelLeft, Pin, Search, Settings, Trash2, Unlink2 } from "lucide-react";
 
-const commands = [
+const defaultCommands = [
   ["all", "Open all notes", LayoutGrid],
   ["create", "Create a new note", FilePlus2],
   ["favorites", "Show favorites", Heart],
   ["pinned", "Show pinned notes", Pin],
   ["trash", "Open trash", Trash2],
+  ["graph", "Open knowledge graph", Network],
+  ["orphans", "Show orphan notes", Unlink2],
   ["sidebar", "Toggle sidebar", PanelLeft],
   ["settings", "Open settings", Settings],
 ];
 
-const CommandPalette = ({ open, onClose, onCommand }) => {
+const CommandPalette = ({ open, onClose, onCommand, extraCommands = [] }) => {
   const [query, setQuery] = useState("");
   const [selected, setSelected] = useState(0);
+  const commands = [...defaultCommands, ...extraCommands];
   const filtered = commands.filter(([, label]) => label.toLowerCase().includes(query.toLowerCase()));
 
   useEffect(() => {

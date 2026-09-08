@@ -1,5 +1,16 @@
 import Note from "../models/Note.js";
 import Mutation from "../models/Mutation.js";
+import NoteVersion from "../models/NoteVersion.js";
+import { deleteAttachmentsForNote } from "./attachmentsController.js";
+import mongoose from "mongoose";
+
+function noteReferenceFilter(reference, userId, includeDeleted = false) {
+  const ownership = { user: userId };
+  if (!includeDeleted) ownership.deletedAt = null;
+  return mongoose.isValidObjectId(reference)
+    ? { ...ownership, _id: reference }
+    : { ...ownership, clientNoteId: reference };
+}
 
 function operationIdFrom(req) {
   return req.body?.operationId || req.get("Idempotency-Key");
@@ -84,6 +95,28 @@ function conflictResponse(res, serverNote) {
   });
 }
 
+async function saveVersion(note, operationType = "UPDATE_NOTE") {
+  if (!note?._id || !note.user || !note.revision) return;
+  await NoteVersion.updateOne(
+    { user: note.user, note: note._id, revision: note.revision },
+    {
+      $setOnInsert: {
+        user: note.user,
+        note: note._id,
+        revision: note.revision,
+        title: note.title,
+        content: note.content,
+        tags: note.tags || [],
+        isPinned: Boolean(note.isPinned),
+        isFavorite: Boolean(note.isFavorite),
+        deletedAt: note.deletedAt || null,
+        operationType,
+      },
+    },
+    { upsert: true },
+  );
+}
+
 export async function getAllNotes(req, res) {
   // send the notes
   // res.status(200).send("You just fetched the notes");
@@ -101,11 +134,9 @@ export async function getAllNotes(req, res) {
 export async function getSelectionById(req, res) {
   // find note by id and send it
   try {
-    const findNote = await Note.findOne({
-      _id: req.params.id,
-      user: req.user._id,
-      deletedAt: null,
-    });
+    const findNote = await Note.findOne(
+      noteReferenceFilter(req.params.id, req.user._id),
+    );
     if (!findNote) return res.status(404).json({ message: "Note not found" });
 
     res.status(200).json(findNote);
@@ -115,10 +146,62 @@ export async function getSelectionById(req, res) {
   }
 }
 
+export async function getNoteVersions(req, res) {
+  try {
+    const note = await Note.findOne(
+      noteReferenceFilter(req.params.id, req.user._id, true),
+    ).select("_id");
+    if (!note) return res.status(404).json({ message: "Note not found" });
+    const versions = await NoteVersion.find({ user: req.user._id, note: note._id })
+      .sort({ revision: -1 })
+      .limit(100)
+      .select("revision title content tags isPinned isFavorite deletedAt operationType createdAt updatedAt");
+    res.status(200).json(versions);
+  } catch (error) {
+    console.error("Error in getNoteVersions:", error.message);
+    res.status(500).json({ message: "Could not fetch note history" });
+  }
+}
+
+export async function restoreNoteVersion(req, res) {
+  try {
+    const baseRevision = baseRevisionFrom(req);
+    const restore = async () => {
+      const note = await Note.findOne(
+        noteReferenceFilter(req.params.id, req.user._id, true),
+      );
+      if (!note) return { status: 404, body: { message: "Note not found" } };
+      if (baseRevision !== undefined && note.revision !== baseRevision) {
+        return { status: 409, body: { code: "REVISION_CONFLICT", message: "The note changed elsewhere", serverNote: note } };
+      }
+      const version = await NoteVersion.findOne({
+        _id: req.params.versionId,
+        user: req.user._id,
+        note: note._id,
+      });
+      if (!version) return { status: 404, body: { message: "Version not found" } };
+      await saveVersion(note, "RESTORE_VERSION");
+      const updatedNote = await Note.findOneAndUpdate(
+        { _id: note._id, user: req.user._id, revision: note.revision },
+        { $set: { title: version.title, content: version.content, tags: version.tags, isPinned: version.isPinned, isFavorite: version.isFavorite, deletedAt: version.deletedAt || null }, $inc: { revision: 1 } },
+        { new: true, runValidators: true },
+      );
+      if (!updatedNote) return { status: 409, body: { code: "REVISION_CONFLICT", message: "The note changed elsewhere", serverNote: await Note.findById(note._id) } };
+      return { status: 200, body: updatedNote };
+    };
+    const result = await runIdempotentMutation(req, res, restore);
+    if (result?.status === 409 && result.body?.code === "REVISION_CONFLICT") return result;
+    return result;
+  } catch (error) {
+    console.error("Error in restoreNoteVersion:", error.message);
+    res.status(500).json({ message: "Could not restore note version" });
+  }
+}
+
 export async function createNote(req, res) {
   // create a new note
   try {
-    const { title, content, tags = [], clientNoteId } = req.body;
+    const { title, content, tags = [], clientNoteId, isPinned, isFavorite } = req.body;
     const create = async () => {
       if (clientNoteId) {
         const existing = await Note.findOne({
@@ -134,6 +217,8 @@ export async function createNote(req, res) {
         content,
         tags: normalizeTags(tags),
         clientNoteId: clientNoteId || null,
+        isPinned: Boolean(isPinned),
+        isFavorite: Boolean(isFavorite),
       });
 
       const savedNote = await note.save();
@@ -157,8 +242,15 @@ export async function updateNote(req, res) {
     if (isPinned !== undefined) updates.isPinned = Boolean(isPinned);
     if (isFavorite !== undefined) updates.isFavorite = Boolean(isFavorite);
     const update = async () => {
-      const filter = { _id: req.params.id, user: req.user._id };
+      const filter = noteReferenceFilter(req.params.id, req.user._id, true);
       addRevisionFilter(filter, baseRevision);
+      const currentNote = await Note.findOne(filter);
+      if (!currentNote) {
+        const existingNote = await Note.findOne(noteReferenceFilter(req.params.id, req.user._id, true));
+        if (!existingNote) return { status: 404, body: { message: "Note not found" } };
+        return { status: 409, body: { code: "REVISION_CONFLICT", message: "The note changed elsewhere", serverNote: existingNote } };
+      }
+      await saveVersion(currentNote, "UPDATE_NOTE");
       const updatedNote = await Note.findOneAndUpdate(
         filter,
         { $set: updates, $inc: { revision: 1 } },
@@ -166,13 +258,20 @@ export async function updateNote(req, res) {
       );
       if (updatedNote) return { status: 200, body: updatedNote };
 
-      const currentNote = await Note.findOne({
-        _id: req.params.id,
-        user: req.user._id,
-      });
-      if (!currentNote) return { status: 404, body: { message: "Note not found" } };
+      const existingNoteAfter = await Note.findOne(
+        noteReferenceFilter(req.params.id, req.user._id, true),
+      );
+      if (!existingNoteAfter)
+        return { status: 404, body: { message: "Note not found" } };
       if (baseRevision !== undefined) {
-        return { status: 409, body: { code: "REVISION_CONFLICT", message: "The note changed elsewhere", serverNote: currentNote } };
+        return {
+          status: 409,
+          body: {
+            code: "REVISION_CONFLICT",
+            message: "The note changed elsewhere",
+            serverNote: existingNoteAfter,
+          },
+        };
       }
       return { status: 404, body: { message: "Note not found" } };
     };
@@ -180,11 +279,13 @@ export async function updateNote(req, res) {
     const operationId = operationIdFrom(req);
     if (operationId) {
       const result = await runIdempotentMutation(req, res, update);
-      if (result?.status === 409 && result.body?.code === "REVISION_CONFLICT") return result;
+      if (result?.status === 409 && result.body?.code === "REVISION_CONFLICT")
+        return result;
       return result;
     }
     const result = await update();
-    if (result.status === 409) return conflictResponse(res, result.body.serverNote);
+    if (result.status === 409)
+      return conflictResponse(res, result.body.serverNote);
     return res.status(result.status).json(result.body);
   } catch (error) {
     console.error("Error in updateNote:", error);
@@ -197,22 +298,37 @@ export async function deleteNote(req, res) {
   try {
     const baseRevision = baseRevisionFrom(req);
     const remove = async () => {
-      const filter = { _id: req.params.id, user: req.user._id, deletedAt: null };
+      const filter = noteReferenceFilter(req.params.id, req.user._id);
       addRevisionFilter(filter, baseRevision);
       const deletedNote = await Note.findOneAndUpdate(
         filter,
         { $set: { deletedAt: new Date() }, $inc: { revision: 1 } },
         { new: true },
       );
-      if (deletedNote) return { status: 200, body: deletedNote };
-      const currentNote = await Note.findOne({ _id: req.params.id, user: req.user._id });
-      if (!currentNote) return { status: 404, body: { message: "Note not found" } };
-      if (baseRevision !== undefined && currentNote.revision !== baseRevision) return { status: 409, body: { code: "REVISION_CONFLICT", message: "The note changed elsewhere", serverNote: currentNote } };
+      if (deletedNote) {
+        await saveVersion(deletedNote, "DELETE_NOTE");
+        return { status: 200, body: deletedNote };
+      }
+      const currentNote = await Note.findOne(
+        noteReferenceFilter(req.params.id, req.user._id, true),
+      );
+      if (!currentNote)
+        return { status: 404, body: { message: "Note not found" } };
+      if (baseRevision !== undefined && currentNote.revision !== baseRevision)
+        return {
+          status: 409,
+          body: {
+            code: "REVISION_CONFLICT",
+            message: "The note changed elsewhere",
+            serverNote: currentNote,
+          },
+        };
       return { status: 404, body: { message: "Note not found" } };
     };
     if (operationIdFrom(req)) return runIdempotentMutation(req, res, remove);
     const result = await remove();
-    if (result.status === 409) return conflictResponse(res, result.body.serverNote);
+    if (result.status === 409)
+      return conflictResponse(res, result.body.serverNote);
     return res.status(result.status).json(result.body);
   } catch (error) {
     console.error("Error in deleteNote:", error);
@@ -237,17 +353,30 @@ export async function restoreNote(req, res) {
   try {
     const baseRevision = baseRevisionFrom(req);
     const restore = async () => {
-      const filter = { _id: req.params.id, user: req.user._id };
+      const filter = noteReferenceFilter(req.params.id, req.user._id, true);
       addRevisionFilter(filter, baseRevision);
       const note = await Note.findOneAndUpdate(
         filter,
         { $set: { deletedAt: null }, $inc: { revision: 1 } },
         { new: true },
       );
-      if (note) return { status: 200, body: note };
-      const currentNote = await Note.findOne({ _id: req.params.id, user: req.user._id });
-      if (!currentNote) return { status: 404, body: { message: "Note not found" } };
-      return { status: 409, body: { code: "REVISION_CONFLICT", message: "The note changed elsewhere", serverNote: currentNote } };
+      if (note) {
+        await saveVersion(note, "RESTORE_NOTE");
+        return { status: 200, body: note };
+      }
+      const currentNote = await Note.findOne(
+        noteReferenceFilter(req.params.id, req.user._id, true),
+      );
+      if (!currentNote)
+        return { status: 404, body: { message: "Note not found" } };
+      return {
+        status: 409,
+        body: {
+          code: "REVISION_CONFLICT",
+          message: "The note changed elsewhere",
+          serverNote: currentNote,
+        },
+      };
     };
     return runIdempotentMutation(req, res, restore);
   } catch (error) {
@@ -258,13 +387,15 @@ export async function restoreNote(req, res) {
 
 export async function permanentlyDeleteNote(req, res) {
   try {
-    const note = await Note.findOneAndDelete({
+    const note = await Note.findOne({
       _id: req.params.id,
       user: req.user._id,
       deletedAt: { $ne: null },
     });
     if (!note)
       return res.status(404).json({ message: "Trashed note not found" });
+    await deleteAttachmentsForNote(note._id, req.user._id);
+    await note.deleteOne();
     res.status(200).json({ message: "Note permanently deleted" });
   } catch (error) {
     console.error("Error in permanentlyDeleteNote:", error.message);
@@ -274,6 +405,8 @@ export async function permanentlyDeleteNote(req, res) {
 
 export async function emptyTrash(req, res) {
   try {
+    const notes = await Note.find({ user: req.user._id, deletedAt: { $ne: null } }).select("_id");
+    await Promise.all(notes.map((note) => deleteAttachmentsForNote(note._id, req.user._id)));
     await Note.deleteMany({ user: req.user._id, deletedAt: { $ne: null } });
     res.status(200).json({ message: "Trash emptied" });
   } catch (error) {

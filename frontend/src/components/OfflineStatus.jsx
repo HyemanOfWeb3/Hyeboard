@@ -3,10 +3,13 @@ import { Download, RefreshCw, Wifi, WifiOff } from "lucide-react";
 import { useRegisterSW } from "virtual:pwa-register/react";
 import { useOnlineStatus } from "../lib/useOnlineStatus";
 import { useSyncStatus } from "../lib/useSyncStatus";
+import { retryFailedOperations } from "../lib/syncEngine";
+import { useAuth } from "../lib/useAuth";
 
 const OfflineStatus = () => {
   const { status, isOnline } = useOnlineStatus();
   const syncStatus = useSyncStatus();
+  const { user } = useAuth();
   const { offlineReady, needRefresh, updateServiceWorker } = useRegisterSW();
   const [installPrompt, setInstallPrompt] = useState(null);
   const [showBackOnline, setShowBackOnline] = useState(false);
@@ -23,7 +26,10 @@ const OfflineStatus = () => {
         window.clearTimeout(timerRef.current);
       }
       setShowBackOnline(true);
-      timerRef.current = window.setTimeout(() => setShowBackOnline(false), 1800);
+      timerRef.current = window.setTimeout(
+        () => setShowBackOnline(false),
+        1800,
+      );
     };
 
     const handleOffline = () => {
@@ -38,7 +44,10 @@ const OfflineStatus = () => {
     window.addEventListener("offline", handleOffline);
 
     return () => {
-      window.removeEventListener("beforeinstallprompt", handleBeforeInstallPrompt);
+      window.removeEventListener(
+        "beforeinstallprompt",
+        handleBeforeInstallPrompt,
+      );
       window.removeEventListener("online", handleOnline);
       window.removeEventListener("offline", handleOffline);
       if (timerRef.current) {
@@ -98,27 +107,55 @@ const OfflineStatus = () => {
 
   if (syncStatus.status === "syncing") {
     return (
-      <div className="status-banner status-banner--reconnecting" role="status" aria-live="polite">
+      <div
+        className="status-banner status-banner--reconnecting"
+        role="status"
+        aria-live="polite"
+      >
         <RefreshCw size={15} className="spin" />
         <span>Syncing…</span>
       </div>
     );
   }
 
-  if (syncStatus.status === "conflict" || syncStatus.status === "auth-required") {
+  if (
+    syncStatus.status === "conflict" ||
+    syncStatus.status === "auth-required"
+  ) {
     return (
-      <div className="status-banner status-banner--offline" role="status" aria-live="polite">
+      <div
+        className="status-banner status-banner--offline"
+        role="status"
+        aria-live="polite"
+      >
         <WifiOff size={15} />
-        <span>{syncStatus.status === "conflict" ? "Sync issue: review a note" : "Sign in to sync changes"}</span>
+        <span>
+          {syncStatus.status === "conflict"
+            ? "Sync issue: review a note"
+            : "Sign in to sync changes"}
+        </span>
       </div>
     );
   }
 
   if (syncStatus.status === "error") {
+    const userId = user?.id || user?._id;
     return (
-      <div className="status-banner status-banner--offline" role="status" aria-live="polite">
+      <div
+        className="status-banner status-banner--offline"
+        role="status"
+        aria-live="polite"
+      >
         <RefreshCw size={15} />
         <span>Sync issue · retrying</span>
+        {userId && (
+          <button
+            className="text-button inline-text-button"
+            onClick={() => retryFailedOperations(userId)}
+          >
+            Retry
+          </button>
+        )}
       </div>
     );
   }

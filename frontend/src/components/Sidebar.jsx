@@ -1,4 +1,5 @@
 import { createElement } from "react";
+import { useNavigate } from "react-router";
 import {
   Archive,
   Clock3,
@@ -7,6 +8,7 @@ import {
   PanelLeftClose,
   PanelLeftOpen,
   Pin,
+  Network,
   Settings,
   Tag,
   Trash2,
@@ -18,11 +20,20 @@ const items = [
   { id: "today", label: "Today", icon: Archive },
   { id: "favorites", label: "Favorites", icon: Heart },
   { id: "pinned", label: "Pinned", icon: Pin },
+  { id: "graph", label: "Graph", icon: Network },
+  { id: "orphan", label: "Orphan notes", icon: Network },
   { id: "trash", label: "Trash", icon: Trash2 },
 ];
 
-const Sidebar = ({ activeView, setActiveView, counts, tags, collapsed, onToggle, onClose }) => (
-  <aside className={`sidebar ${collapsed ? "sidebar--collapsed" : ""}`}>
+const Sidebar = ({ activeView, setActiveView, counts, tags, collapsed, onToggle, onClose }) => {
+  const navigate = useNavigate();
+  const selectView = (view) => {
+    if (view === "graph") navigate("/graph");
+    else setActiveView(view);
+    onClose?.();
+  };
+
+  return <aside className={`sidebar ${collapsed ? "sidebar--collapsed" : ""}`}>
     <div className="sidebar__topline">
       {!collapsed && <span className="eyebrow">Workspace</span>}
       <button className="icon-button" onClick={onToggle} aria-label={collapsed ? "Expand sidebar" : "Collapse sidebar"}>
@@ -35,7 +46,7 @@ const Sidebar = ({ activeView, setActiveView, counts, tags, collapsed, onToggle,
           <button
             key={id}
             className={`nav-item ${activeView === id ? "nav-item--active" : ""}`}
-            onClick={() => { setActiveView(id); onClose?.(); }}
+            onClick={() => selectView(id)}
             title={collapsed ? label : undefined}
           >
             {createElement(Icon, { size: 18, strokeWidth: 1.8 })}
@@ -47,7 +58,7 @@ const Sidebar = ({ activeView, setActiveView, counts, tags, collapsed, onToggle,
         <div className="sidebar__section sidebar__tags">
           <div className="sidebar__label"><Tag size={14} /> <span>Tags</span></div>
           {tags.slice(0, 8).map((tag) => (
-            <button key={tag} className={`tag-link ${activeView === `tag:${tag}` ? "tag-link--active" : ""}`} onClick={() => { setActiveView(`tag:${tag}`); onClose?.(); }}>
+              <button key={tag} className={`tag-link ${activeView === `tag:${tag}` ? "tag-link--active" : ""}`} onClick={() => { setActiveView(`tag:${tag}`); onClose?.(); }}>
               <span>#{tag}</span><small>{counts.tags?.[tag] || 0}</small>
             </button>
           ))}
@@ -55,7 +66,7 @@ const Sidebar = ({ activeView, setActiveView, counts, tags, collapsed, onToggle,
       )}
     </nav>
     {!collapsed && <button className="nav-item sidebar__settings" onClick={() => setActiveView("settings")}><Settings size={18} /><span>Settings</span></button>}
-  </aside>
-);
+  </aside>;
+};
 
 export default Sidebar;

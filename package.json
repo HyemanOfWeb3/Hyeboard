@@ -6,7 +6,10 @@
   "main": "index.js",
   "scripts": {
     "build": "npm install --prefix frontend --include=dev && npm run build --prefix frontend",
-    "start": "npm run start --prefix backend"
+    "start": "npm run start --prefix backend",
+    "test:e2e": "playwright test",
+    "test:api": "npm test --prefix backend",
+    "audit": "npm audit --omit=dev"
   },
   "repository": {
     "type": "git",
@@ -29,5 +32,8 @@
     "express": "^4.18.2",
     "jsonwebtoken": "^9.0.3",
     "mongoose": "^8.14.3"
+  },
+  "devDependencies": {
+    "@playwright/test": "^1.63.0"
   }
 }

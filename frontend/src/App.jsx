@@ -1,4 +1,4 @@
-import React from "react";
+import { lazy, Suspense } from "react";
 import { Navigate, Routes, Route, useLocation } from "react-router";
 
 import HomePage from "./pages/HomePage.jsx";
@@ -6,6 +6,7 @@ import CreatePage from "./pages/CreatePage.jsx";
 import NoteDetailPage from "./pages/NoteDetailPage.jsx";
 import LoginPage from "./pages/LoginPage.jsx";
 import SignupPage from "./pages/SignupPage.jsx";
+const GraphPage = lazy(() => import("./pages/GraphPage.jsx"));
 import { useAuth } from "./lib/useAuth.js";
 
 const ProtectedRoute = ({ children }) => {
@@ -47,6 +48,22 @@ const App = () => {
           element={
             <ProtectedRoute>
               <NoteDetailPage />
+            </ProtectedRoute>
+          }
+        />
+        <Route
+          path="/graph"
+          element={
+            <ProtectedRoute>
+              <Suspense fallback={<div className="editor-loading">Loading knowledge graph...</div>}><GraphPage /></Suspense>
+            </ProtectedRoute>
+          }
+        />
+        <Route
+          path="/graph/:id"
+          element={
+            <ProtectedRoute>
+              <Suspense fallback={<div className="editor-loading">Loading knowledge graph...</div>}><GraphPage /></Suspense>
             </ProtectedRoute>
           }
         />

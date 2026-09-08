@@ -51,7 +51,10 @@ const noteSchema = new mongoose.Schema(
 
 noteSchema.index(
   { user: 1, clientNoteId: 1 },
-  { unique: true, partialFilterExpression: { clientNoteId: { $type: "string" } } },
+  {
+    unique: true,
+    partialFilterExpression: { clientNoteId: { $type: "string" } },
+  },
 );
 
 const Note = mongoose.model("Note", noteSchema);

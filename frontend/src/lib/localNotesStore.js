@@ -1,6 +1,8 @@
 const DB_NAME = "hyeboard-db";
 const STORE_NAME = "notes-by-user";
 const ACTIVE_USER_KEY = "hyeboard:active-user";
+const VERSION_STORE_NAME = "note-versions";
+const MAX_LOCAL_VERSIONS_PER_NOTE = 50;
 
 function isIndexedDBAvailable() {
   return typeof window !== "undefined" && "indexedDB" in window;
@@ -46,7 +48,7 @@ function openDatabase() {
       return;
     }
 
-    const request = window.indexedDB.open(DB_NAME, 2);
+    const request = window.indexedDB.open(DB_NAME, 4);
 
     request.onupgradeneeded = () => {
       const database = request.result;
@@ -64,6 +66,24 @@ function openDatabase() {
       }
       if (!database.objectStoreNames.contains("syncMeta")) {
         database.createObjectStore("syncMeta", { keyPath: "userId" });
+      }
+      if (!database.objectStoreNames.contains("conflicts")) {
+        const conflicts = database.createObjectStore("conflicts", {
+          keyPath: "conflictId",
+        });
+        conflicts.createIndex("userId", "userId", { unique: false });
+        conflicts.createIndex("userNote", ["userId", "noteId"], {
+          unique: false,
+        });
+        conflicts.createIndex("status", "status", { unique: false });
+      }
+      if (!database.objectStoreNames.contains(VERSION_STORE_NAME)) {
+        const versions = database.createObjectStore(VERSION_STORE_NAME, {
+          keyPath: "versionId",
+        });
+        versions.createIndex("userNote", ["userId", "noteId"], {
+          unique: false,
+        });
       }
     };
 
@@ -129,11 +149,11 @@ export function mergeServerWithLocal(localNotes = [], serverNotes = []) {
   const byId = new Map();
 
   serverNotes.forEach((note) => {
-    byId.set(note._id || note.id, note);
+    byId.set(note.clientNoteId || note._id || note.id, note);
   });
 
   localNotes.forEach((localNote) => {
-    const id = localNote._id || localNote.id;
+    const id = localNote.clientNoteId || localNote._id || localNote.id;
     const existing = byId.get(id);
 
     if (!existing) {
@@ -166,6 +186,58 @@ export async function getLocalNotesForUser(userId) {
   return readScope(userId);
 }
 
+export async function getLocalNoteForUser(userId, noteId) {
+  const scope = await readScope(userId);
+  return (
+    [...scope.notes, ...scope.trash].find(
+      (note) =>
+        (note._id || note.id || note.clientNoteId) === noteId ||
+        note.clientNoteId === noteId,
+    ) || null
+  );
+}
+
+export async function saveLocalNoteVersion(userId, note, operationType = "UPDATE_NOTE") {
+  if (!userId || !note?._id || !isIndexedDBAvailable()) return null;
+  const database = await openDatabase();
+  const version = {
+    versionId: `${normalizeUserId(userId)}:${note._id}:${note.revision || 0}:${Date.now()}`,
+    userId: normalizeUserId(userId),
+    noteId: note._id,
+    revision: Number(note.revision || 0),
+    title: note.title || "",
+    content: note.content || "",
+    tags: note.tags || [],
+    isPinned: Boolean(note.isPinned),
+    isFavorite: Boolean(note.isFavorite),
+    deletedAt: note.deletedAt || null,
+    operationType,
+    createdAt: new Date().toISOString(),
+  };
+  const transaction = database.transaction(VERSION_STORE_NAME, "readwrite");
+  const store = transaction.objectStore(VERSION_STORE_NAME);
+  await requestResult(store.put(version));
+  const versions = await requestResult(
+    store.index("userNote").getAll([version.userId, version.noteId]),
+  );
+  versions.sort((left, right) => right.createdAt.localeCompare(left.createdAt));
+  versions.slice(MAX_LOCAL_VERSIONS_PER_NOTE).forEach((item) => store.delete(item.versionId));
+  return version;
+}
+
+export async function getLocalNoteVersions(userId, noteId) {
+  if (!userId || !noteId || !isIndexedDBAvailable()) return [];
+  const database = await openDatabase();
+  const transaction = database.transaction(VERSION_STORE_NAME, "readonly");
+  const versions = await requestResult(
+    transaction.objectStore(VERSION_STORE_NAME).index("userNote").getAll([
+      normalizeUserId(userId),
+      noteId,
+    ]),
+  );
+  return versions.sort((left, right) => right.createdAt.localeCompare(left.createdAt));
+}
+
 export async function persistLocalNotesForUser(userId, notes = [], trash = []) {
   const nextNotes = (Array.isArray(notes) ? notes : []).map((note) =>
     normalizeLocalNote(note, userId),
@@ -181,12 +253,17 @@ export async function upsertLocalNoteForUser(userId, note) {
   const scope = await readScope(userId);
   const normalized = normalizeLocalNote(note, userId);
   const noteId = normalized._id;
+  const clientNoteId = normalized.clientNoteId;
 
   const currentNotes = (scope.notes || []).filter(
-    (item) => (item._id || item.id) !== noteId,
+    (item) =>
+      (item._id || item.id) !== noteId &&
+      (!clientNoteId || item.clientNoteId !== clientNoteId),
   );
   const currentTrash = (scope.trash || []).filter(
-    (item) => (item._id || item.id) !== noteId,
+    (item) =>
+      (item._id || item.id) !== noteId &&
+      (!clientNoteId || item.clientNoteId !== clientNoteId),
   );
 
   const nextNotes = normalized.deletedAt
@@ -278,9 +355,14 @@ export async function getOperationsForUser(userId) {
   const database = await openDatabase();
   const transaction = database.transaction("operations", "readonly");
   const operations = await requestResult(
-    transaction.objectStore("operations").index("userId").getAll(normalizeUserId(userId)),
+    transaction
+      .objectStore("operations")
+      .index("userId")
+      .getAll(normalizeUserId(userId)),
   );
-  return operations.sort((left, right) => left.createdAt.localeCompare(right.createdAt));
+  return operations.sort((left, right) =>
+    left.createdAt.localeCompare(right.createdAt),
+  );
 }
 
 export async function updateOperation(operation) {
@@ -295,7 +377,9 @@ export async function deleteOperation(operationId) {
   if (!operationId || !isIndexedDBAvailable()) return;
   const database = await openDatabase();
   const transaction = database.transaction("operations", "readwrite");
-  await requestResult(transaction.objectStore("operations").delete(operationId));
+  await requestResult(
+    transaction.objectStore("operations").delete(operationId),
+  );
 }
 
 export async function setSyncMeta(userId, metadata) {
@@ -303,7 +387,9 @@ export async function setSyncMeta(userId, metadata) {
   const database = await openDatabase();
   const transaction = database.transaction("syncMeta", "readwrite");
   await requestResult(
-    transaction.objectStore("syncMeta").put({ userId: normalizeUserId(userId), ...metadata }),
+    transaction
+      .objectStore("syncMeta")
+      .put({ userId: normalizeUserId(userId), ...metadata }),
   );
 }
 
@@ -311,7 +397,71 @@ export async function getSyncMeta(userId) {
   if (!userId || !isIndexedDBAvailable()) return null;
   const database = await openDatabase();
   const transaction = database.transaction("syncMeta", "readonly");
-  return requestResult(transaction.objectStore("syncMeta").get(normalizeUserId(userId)));
+  return requestResult(
+    transaction.objectStore("syncMeta").get(normalizeUserId(userId)),
+  );
+}
+
+export async function saveConflict(userId, conflict) {
+  if (!userId || !conflict?.operationId || !isIndexedDBAvailable()) return null;
+  const database = await openDatabase();
+  const record = {
+    ...conflict,
+    conflictId: conflict.conflictId || conflict.operationId,
+    userId: normalizeUserId(userId),
+    status: conflict.status || "open",
+    createdAt: conflict.createdAt || new Date().toISOString(),
+    updatedAt: new Date().toISOString(),
+  };
+  const transaction = database.transaction("conflicts", "readwrite");
+  await requestResult(transaction.objectStore("conflicts").put(record));
+  window.dispatchEvent(
+    new CustomEvent("hyeboard:conflict-change", {
+      detail: { userId: record.userId, noteId: record.noteId },
+    }),
+  );
+  return record;
+}
+
+export async function getConflictsForUser(userId, status = "open") {
+  if (!userId || !isIndexedDBAvailable()) return [];
+  const database = await openDatabase();
+  const transaction = database.transaction("conflicts", "readonly");
+  const conflicts = await requestResult(
+    transaction
+      .objectStore("conflicts")
+      .index("userId")
+      .getAll(normalizeUserId(userId)),
+  );
+  return conflicts
+    .filter((conflict) => !status || conflict.status === status)
+    .sort((left, right) => right.updatedAt.localeCompare(left.updatedAt));
+}
+
+export async function getConflictForNote(userId, noteId) {
+  const conflicts = await getConflictsForUser(userId);
+  return conflicts.find((conflict) => conflict.noteId === noteId) || null;
+}
+
+export async function updateConflict(conflict) {
+  if (!conflict?.conflictId || !isIndexedDBAvailable()) return conflict;
+  const database = await openDatabase();
+  const transaction = database.transaction("conflicts", "readwrite");
+  const record = { ...conflict, updatedAt: new Date().toISOString() };
+  await requestResult(transaction.objectStore("conflicts").put(record));
+  window.dispatchEvent(
+    new CustomEvent("hyeboard:conflict-change", {
+      detail: { userId: record.userId, noteId: record.noteId },
+    }),
+  );
+  return record;
+}
+
+export async function deleteConflict(conflictId) {
+  if (!conflictId || !isIndexedDBAvailable()) return;
+  const database = await openDatabase();
+  const transaction = database.transaction("conflicts", "readwrite");
+  await requestResult(transaction.objectStore("conflicts").delete(conflictId));
 }
 
 export async function replaceLocalNoteIdForUser(userId, localId, serverNote) {
@@ -320,13 +470,47 @@ export async function replaceLocalNoteIdForUser(userId, localId, serverNote) {
   const replace = (items) =>
     items.map((item) =>
       (item._id || item.id) === localId
-        ? { ...serverNote, localOnly: false, syncedAt: new Date().toISOString() }
+        ? {
+            ...serverNote,
+            localOnly: false,
+            syncedAt: new Date().toISOString(),
+          }
         : item,
     );
   await writeScope(userId, {
     notes: replace(scope.notes),
     trash: replace(scope.trash),
   });
+
+  const database = await openDatabase();
+  const versionTransaction = database.transaction(VERSION_STORE_NAME, "readwrite");
+  const versionStore = versionTransaction.objectStore(VERSION_STORE_NAME);
+  const localVersions = await requestResult(
+    versionStore.index("userNote").getAll([normalizeUserId(userId), localId]),
+  );
+  localVersions.forEach((version) => {
+    versionStore.delete(version.versionId);
+    versionStore.put({
+      ...version,
+      versionId: `${normalizeUserId(userId)}:${serverNote._id}:${version.revision}:${version.createdAt}`,
+      noteId: serverNote._id,
+    });
+  });
+
+  const conflicts = await getConflictsForUser(userId, "");
+  await Promise.all(
+    conflicts
+      .filter((conflict) => conflict.noteId === localId)
+      .map((conflict) =>
+        updateConflict({
+          ...conflict,
+          noteId: serverNote._id,
+          localNote: conflict.localNote
+            ? { ...conflict.localNote, _id: serverNote._id, id: serverNote._id }
+            : conflict.localNote,
+        }),
+      ),
+  );
 
   const operations = await getOperationsForUser(userId);
   await Promise.all(

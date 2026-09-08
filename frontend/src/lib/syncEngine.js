@@ -2,8 +2,10 @@ import api from "./axios";
 import {
   deleteOperation,
   enqueueOperation,
+  getLocalNoteForUser,
   getOperationsForUser,
   replaceLocalNoteIdForUser,
+  saveConflict,
   setSyncMeta,
   updateOperation,
   upsertLocalNoteForUser,
@@ -17,7 +19,38 @@ let fallbackLock = false;
 let sequence = 0;
 let snapshot = { status: "idle", userId: null, pending: 0, error: null };
 const subscribers = new Set();
-const channel = typeof BroadcastChannel !== "undefined" ? new BroadcastChannel("hyeboard-sync") : null;
+const channel =
+  typeof BroadcastChannel !== "undefined"
+    ? new BroadcastChannel("hyeboard-sync")
+    : null;
+
+function acquireFallbackLock(userId) {
+  const key = `hyeboard:sync-lock:${userId}`;
+  const token = `${Date.now()}-${Math.random().toString(16).slice(2)}`;
+  try {
+    const current = JSON.parse(localStorage.getItem(key) || "null");
+    if (current?.expiresAt > Date.now()) return null;
+    localStorage.setItem(
+      key,
+      JSON.stringify({ token, expiresAt: Date.now() + 30_000 }),
+    );
+    return JSON.parse(localStorage.getItem(key) || "null")?.token === token
+      ? { key, token }
+      : null;
+  } catch {
+    return null;
+  }
+}
+
+function releaseFallbackLock(lock) {
+  if (!lock) return;
+  try {
+    const current = JSON.parse(localStorage.getItem(lock.key) || "null");
+    if (current?.token === lock.token) localStorage.removeItem(lock.key);
+  } catch {
+    // A failed lease cleanup expires naturally.
+  }
+}
 
 function publish(next) {
   snapshot = { ...snapshot, ...next };
@@ -47,7 +80,9 @@ async function request(operation) {
     return api.post("/notes", data, { skipAuthRedirect: true });
   }
   if (operation.type === "UPDATE_NOTE") {
-    return api.put(`/notes/${operation.noteId}`, data, { skipAuthRedirect: true });
+    return api.put(`/notes/${operation.noteId}`, data, {
+      skipAuthRedirect: true,
+    });
   }
   if (operation.type === "DELETE_NOTE") {
     return api.delete(`/notes/${operation.noteId}`, {
@@ -92,21 +127,49 @@ async function processOperation(userId, operation, currentSequence) {
   } catch (error) {
     const status = error.response?.status;
     if (status === 401) {
-      await updateOperation({ ...syncing, status: "pending", nextAttemptAt: new Date().toISOString(), lastError: "Authentication required" });
-      publish({ status: "auth-required", error: "Authentication required" });
-      return;
-    }
-    if (status === 409 && error.response?.data?.code === "SYNC_OPERATION_IN_PROGRESS") {
       await updateOperation({
         ...syncing,
         status: "pending",
-        nextAttemptAt: new Date(Date.now() + retryDelay(syncing.attempts)).toISOString(),
+        nextAttemptAt: new Date().toISOString(),
+        lastError: "Authentication required",
+      });
+      publish({ status: "auth-required", error: "Authentication required" });
+      return;
+    }
+    if (
+      status === 409 &&
+      error.response?.data?.code === "SYNC_OPERATION_IN_PROGRESS"
+    ) {
+      await updateOperation({
+        ...syncing,
+        status: "pending",
+        nextAttemptAt: new Date(
+          Date.now() + retryDelay(syncing.attempts),
+        ).toISOString(),
         lastError: error.response.data.message,
       });
       publish({ status: "error", error: error.response.data.message });
       return;
     }
     if (status === 409 && error.response?.data?.code === "REVISION_CONFLICT") {
+      const localNote = (await getLocalNoteForUser(userId, syncing.noteId)) || {
+        _id: syncing.noteId,
+        title: syncing.payload?.title || "",
+        content: syncing.payload?.content || "",
+        tags: syncing.payload?.tags || [],
+        isPinned: Boolean(syncing.payload?.isPinned),
+        isFavorite: Boolean(syncing.payload?.isFavorite),
+        revision: syncing.baseRevision,
+      };
+      await saveConflict(userId, {
+        operationId: syncing.operationId,
+        noteId: syncing.noteId,
+        localNote,
+        serverNote: error.response.data.serverNote || null,
+        localRevision: syncing.baseRevision,
+        serverRevision: Number(error.response.data.serverNote?.revision || 0),
+        operation: syncing,
+      });
       await updateOperation({
         ...syncing,
         status: "conflict",
@@ -121,10 +184,16 @@ async function processOperation(userId, operation, currentSequence) {
     await updateOperation({
       ...syncing,
       status: retry ? "pending" : "failed",
-      nextAttemptAt: new Date(Date.now() + (retry ? retryDelay(syncing.attempts) : 0)).toISOString(),
-      lastError: error.response?.data?.message || error.message || "Sync failed",
+      nextAttemptAt: new Date(
+        Date.now() + (retry ? retryDelay(syncing.attempts) : 0),
+      ).toISOString(),
+      lastError:
+        error.response?.data?.message || error.message || "Sync failed",
     });
-    publish({ status: retry ? "error" : "error", error: error.message || "Sync failed" });
+    publish({
+      status: retry ? "error" : "error",
+      error: error.message || "Sync failed",
+    });
   }
 }
 
@@ -133,22 +202,52 @@ async function flushWithoutLock(userId, currentSequence) {
   running = true;
   try {
     const operations = await getOperationsForUser(userId);
-    const ready = operations.filter(
+    await Promise.all(
+      operations
+        .filter((operation) => operation.status === "syncing")
+        .map((operation) =>
+          updateOperation({
+            ...operation,
+            status: "pending",
+            nextAttemptAt: new Date().toISOString(),
+            lastError: "Recovered after an interrupted sync attempt",
+          }),
+        ),
+    );
+    const recoveredOperations = operations.map((operation) =>
+      operation.status === "syncing"
+        ? {
+            ...operation,
+            status: "pending",
+            nextAttemptAt: new Date().toISOString(),
+          }
+        : operation,
+    );
+    const ready = recoveredOperations.filter(
       (operation) =>
         operation.status === "pending" &&
         new Date(operation.nextAttemptAt || 0).getTime() <= Date.now(),
     );
-    publish({ status: ready.length ? "syncing" : "synced", pending: ready.length, error: null });
+    publish({
+      status: ready.length ? "syncing" : "synced",
+      pending: ready.length,
+      error: null,
+    });
     for (const operation of ready) {
       if (!isActive(userId, currentSequence)) break;
       await processOperation(userId, operation, currentSequence);
     }
     const remaining = await getOperationsForUser(userId);
-    const hasPending = remaining.some((operation) => ["pending", "syncing"].includes(operation.status));
-    const hasConflict = remaining.some((operation) => operation.status === "conflict");
+    const hasPending = remaining.some((operation) =>
+      ["pending", "syncing"].includes(operation.status),
+    );
+    const hasConflict = remaining.some(
+      (operation) => operation.status === "conflict",
+    );
     publish({
       status: hasConflict ? "conflict" : hasPending ? "error" : "synced",
-      pending: remaining.filter((operation) => operation.status !== "synced").length,
+      pending: remaining.filter((operation) => operation.status !== "synced")
+        .length,
     });
   } finally {
     running = false;
@@ -168,11 +267,14 @@ async function flushUserQueue(userId) {
     return;
   }
   if (fallbackLock) return;
+  const lock = acquireFallbackLock(userId);
+  if (!lock) return;
   fallbackLock = true;
   try {
     await flushWithoutLock(userId, currentSequence);
   } finally {
     fallbackLock = false;
+    releaseFallbackLock(lock);
   }
 }
 
@@ -187,7 +289,11 @@ export function startSyncForUser(userId) {
   if (!normalized) return;
   activeUserId = normalized;
   sequence += 1;
-  publish({ userId: normalized, status: navigator.onLine ? "idle" : "offline", error: null });
+  publish({
+    userId: normalized,
+    status: navigator.onLine ? "idle" : "offline",
+    error: null,
+  });
   requestSync(normalized);
 }
 
@@ -214,9 +320,21 @@ window.addEventListener("online", () => {
   }
 });
 window.addEventListener("offline", () => publish({ status: "offline" }));
-window.addEventListener("focus", () => activeUserId && requestSync(activeUserId));
+window.addEventListener(
+  "focus",
+  () => activeUserId && requestSync(activeUserId),
+);
 channel?.addEventListener("message", (event) => {
-  if (event.data?.type === "sync-request" && event.data.userId === activeUserId) requestSync(activeUserId);
+  if (event.data?.type === "sync-request" && event.data.userId === activeUserId)
+    requestSync(activeUserId);
+  if (
+    event.data?.type === "notes-changed" &&
+    event.data.userId === activeUserId
+  ) {
+    window.dispatchEvent(
+      new CustomEvent("hyeboard:notes-changed", { detail: event.data }),
+    );
+  }
 });
 
 export async function retryFailedOperations(userId) {
@@ -224,7 +342,13 @@ export async function retryFailedOperations(userId) {
   await Promise.all(
     operations
       .filter((operation) => operation.status === "failed")
-      .map((operation) => updateOperation({ ...operation, status: "pending", nextAttemptAt: new Date().toISOString() })),
+      .map((operation) =>
+        updateOperation({
+          ...operation,
+          status: "pending",
+          nextAttemptAt: new Date().toISOString(),
+        }),
+      ),
   );
   requestSync(userId);
 }

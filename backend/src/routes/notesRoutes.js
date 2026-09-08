@@ -9,6 +9,8 @@ import {
   restoreNote,
   permanentlyDeleteNote,
   emptyTrash,
+  getNoteVersions,
+  restoreNoteVersion,
 } from "../controllers/notesController.js";
 import ratelimit from "../config/upstash.js";
 import { requireAuth } from "../middleware/auth.js";
@@ -42,6 +44,8 @@ router.use(requireAuth);
 router.get("/", getAllNotes);
 router.get("/trash", getTrash);
 router.delete("/trash", emptyTrash);
+router.get("/:id/versions", getNoteVersions);
+router.post("/:id/versions/:versionId/restore", restoreNoteVersion);
 router.get("/:id", getSelectionById);
 router.post("/", createNote);
 router.put("/:id", updateNote);
