@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState } from "react";
-import { Download, RefreshCw, Wifi, WifiOff } from "lucide-react";
+import { RefreshCw, Wifi, WifiOff } from "lucide-react";
 import { useRegisterSW } from "virtual:pwa-register/react";
 import { useOnlineStatus } from "../lib/useOnlineStatus";
 import { useSyncStatus } from "../lib/useSyncStatus";
@@ -55,6 +55,10 @@ const OfflineStatus = () => {
       }
     };
   }, []);
+
+  useEffect(() => {
+    if (needRefresh && isOnline) updateServiceWorker(true);
+  }, [isOnline, needRefresh, updateServiceWorker]);
 
   const handleInstall = async () => {
     if (!installPrompt) return;
@@ -156,25 +160,6 @@ const OfflineStatus = () => {
             Retry
           </button>
         )}
-      </div>
-    );
-  }
-
-  if (needRefresh) {
-    return (
-      <div
-        className="status-banner status-banner--update"
-        role="status"
-        aria-live="polite"
-      >
-        <Download size={15} />
-        <span>New version available</span>
-        <button
-          className="text-button inline-text-button"
-          onClick={() => updateServiceWorker(true)}
-        >
-          Refresh
-        </button>
       </div>
     );
   }
