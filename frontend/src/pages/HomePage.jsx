@@ -57,6 +57,7 @@ const HomePage = () => {
       if (cachedState.notes.length || cachedState.trash.length) {
         setNotes(cachedState.notes);
         setTrash(cachedState.trash);
+        setLoading(false);
       }
     } catch {
       cachedState = { notes: [], trash: [] };

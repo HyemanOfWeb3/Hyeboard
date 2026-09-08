@@ -23,6 +23,7 @@ if (!MONGO_URI) {
 
 // Cache connection for serverless functions
 let cachedConnection = null;
+let connectionPromise = null;
 
 export const connectDB = async () => {
   try {
@@ -31,6 +32,8 @@ export const connectDB = async () => {
       console.log("Using cached MongoDB connection");
       return cachedConnection;
     }
+
+    if (connectionPromise) return connectionPromise;
 
     // Ensure a valid connection string is provided
     if (!MONGO_URI || typeof MONGO_URI !== "string" || MONGO_URI.length === 0) {
@@ -42,19 +45,24 @@ export const connectDB = async () => {
     console.log("Creating new MongoDB connection...");
 
     // Connect to MongoDB
-    const connection = await mongoose.connect(MONGO_URI, {
-      serverSelectionTimeoutMS: 10000,
-      socketTimeoutMS: 45000,
-      // Serverless-friendly options
-      maxPoolSize: 1,
-      minPoolSize: 0,
-    });
+    connectionPromise = mongoose
+      .connect(MONGO_URI, {
+        serverSelectionTimeoutMS: 10000,
+        socketTimeoutMS: 45000,
+        // Serverless-friendly options
+        maxPoolSize: 1,
+        minPoolSize: 0,
+      })
+      .then((connection) => {
+        cachedConnection = connection;
+        console.log("MongoDB connected successfully!");
+        return connection;
+      })
+      .finally(() => {
+        connectionPromise = null;
+      });
 
-    // Cache the connection
-    cachedConnection = connection;
-    console.log("MongoDB connected successfully!");
-
-    return connection;
+    return connectionPromise;
   } catch (error) {
     console.error("Error connecting to the database:", error.message || error);
     throw error;
