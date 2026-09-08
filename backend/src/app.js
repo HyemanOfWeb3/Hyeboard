@@ -7,6 +7,7 @@ import { connectDB } from "./config/db.js";
 import rateLimiter from "./middleware/rateLimiter.js";
 import cookieParser from "cookie-parser";
 import helmet from "helmet";
+import { logout } from "./controllers/authController.js";
 
 const app = express();
 
@@ -31,6 +32,9 @@ let dbConnectionError = null;
 app.get("/api/health", (req, res) => {
   res.json({ status: "ok", dbConnected, dbError: dbConnectionError });
 });
+
+// Logout only clears the HTTP-only cookie; it does not require a database round trip.
+app.post("/api/auth/logout", logout);
 
 app.use((req, res, next) => {
   if (!req.path.startsWith("/api") || req.path === "/api/health") {

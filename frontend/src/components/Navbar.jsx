@@ -57,8 +57,8 @@ const Navbar = ({ onSearch, onNewNote, onMenu }) => {
                     <span className="account-dot" /> Settings
                   </button>
                   <button
-                    onClick={async () => {
-                      await logout();
+                    onClick={() => {
+                      void logout();
                       window.location.assign("/login");
                     }}
                   >

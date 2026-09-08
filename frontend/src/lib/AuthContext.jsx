@@ -1,4 +1,5 @@
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
+import { useLocation } from "react-router";
 import api from "./axios";
 import { AuthContext } from "./authContextStore";
 import {
@@ -9,10 +10,17 @@ import {
 import { startSyncForUser, stopSyncForUser } from "./syncEngine";
 
 export function AuthProvider({ children }) {
+  const location = useLocation();
+  const initialPath = useRef(location.pathname);
   const [user, setUser] = useState(null);
-  const [loading, setLoading] = useState(true);
+  const [loading, setLoading] = useState(
+    () => !["/login", "/signup"].includes(location.pathname),
+  );
 
   useEffect(() => {
+    if (["/login", "/signup"].includes(initialPath.current)) {
+      return undefined;
+    }
     const activeUserId = getStoredUserId();
 
     api
@@ -46,12 +54,13 @@ export function AuthProvider({ children }) {
 
   const logout = async () => {
     const userId = user?.id || user?._id;
+    if (userId) stopSyncForUser(userId);
+    setUser(null);
+    clearStoredUserId();
     try {
       await api.post("/auth/logout");
-    } finally {
-      if (userId) stopSyncForUser(userId);
-      setUser(null);
-      clearStoredUserId();
+    } catch {
+      // Local session state is cleared even if the network is unavailable.
     }
   };
 
