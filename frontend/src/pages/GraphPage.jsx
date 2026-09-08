@@ -29,16 +29,20 @@ const GraphPage = () => {
       const localScope = await getLocalNotesForUser(userId);
       let nextNotes = localScope.notes || [];
       let incomplete = !navigator.onLine;
+      setNotes(nextNotes);
+      setOfflineIncomplete(incomplete);
+      setLoading(false);
       if (navigator.onLine) {
         try {
           const response = await api.get("/notes");
           nextNotes = mergeServerWithLocal(nextNotes, response.data || []);
+          setNotes(nextNotes);
+          setOfflineIncomplete(false);
         } catch {
           incomplete = true;
+          setOfflineIncomplete(true);
         }
       }
-      setNotes(nextNotes);
-      setOfflineIncomplete(incomplete);
     } finally {
       setLoading(false);
     }

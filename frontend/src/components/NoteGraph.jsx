@@ -5,6 +5,7 @@ import {
   Controls,
   MiniMap,
   ReactFlow,
+  ReactFlowProvider,
   useReactFlow,
 } from "@xyflow/react";
 import "@xyflow/react/dist/style.css";
@@ -89,7 +90,8 @@ const NoteGraph = ({ graph, currentNoteId, navigate, scope, setScope, depth, set
   }
 
   return (
-    <div className="graph-shell">
+    <ReactFlowProvider>
+      <div className="graph-shell">
       <GraphToolbar {...{ scope, setScope, depth, setDepth, truncated: graph.truncated }} />
       <div className="graph-canvas" aria-label="Knowledge graph">
         <ReactFlow
@@ -113,7 +115,8 @@ const NoteGraph = ({ graph, currentNoteId, navigate, scope, setScope, depth, set
         <div className="eyebrow">Notes in view</div>
         {graph.nodes.map((node) => <a key={node.id} href={getNoteHref(node.note)} onClick={(event) => { event.preventDefault(); navigate(getNoteHref(node.note)); }}><span>{node.title}</span><small>{node.backlinkCount} incoming · {node.outgoingCount} outgoing</small><ExternalLink size={14} /></a>)}
       </div>
-    </div>
+      </div>
+    </ReactFlowProvider>
   );
 };
 
