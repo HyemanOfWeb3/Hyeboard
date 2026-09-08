@@ -28,6 +28,10 @@ app.use(cookieParser());
 let dbConnected = false;
 let dbConnectionError = null;
 
+app.get("/api/health", (req, res) => {
+  res.json({ status: "ok", dbConnected, dbError: dbConnectionError });
+});
+
 app.use((req, res, next) => {
   if (!req.path.startsWith("/api") || req.path === "/api/health") {
     return next();
@@ -53,9 +57,5 @@ app.use(rateLimiter);
 app.use("/api/auth", authRoutes);
 app.use("/api/notes", notesRoutes);
 app.use("/api/attachments", attachmentsRoutes);
-
-app.get("/api/health", (req, res) => {
-  res.json({ status: "ok", dbConnected, dbError: dbConnectionError });
-});
 
 export default app;
