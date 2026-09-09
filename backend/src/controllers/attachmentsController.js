@@ -14,6 +14,7 @@ import {
   getAttachmentBucket,
   getObjectStorageClient,
 } from "../config/objectStorage.js";
+import { getNoteAccess, canEdit } from "../services/collaborationService.js";
 
 const upload = multer({
   storage: multer.memoryStorage(),
@@ -51,7 +52,8 @@ async function validateFile(file) {
 }
 
 async function noteForUser(noteId, userId, includeDeleted = false) {
-  return Note.findOne(noteFilter(noteId, userId, includeDeleted)).select("_id user deletedAt");
+  const access = await getNoteAccess(noteId, userId, includeDeleted);
+  return access ? { ...access.note, role: access.role } : null;
 }
 
 async function signedAttachment(attachment, storage) {
@@ -68,7 +70,7 @@ export async function listAttachments(req, res) {
     const note = await noteForUser(req.params.noteId, req.user._id, true);
     if (!note) return res.status(404).json({ message: "Note not found" });
     const storage = getObjectStorageClient();
-    const attachments = await Attachment.find({ user: req.user._id, note: note._id }).sort({ createdAt: -1 });
+    const attachments = await Attachment.find({ note: note._id }).sort({ createdAt: -1 });
     res.json(await Promise.all(attachments.map((attachment) => signedAttachment(attachment, storage))));
   } catch (error) {
     console.error("Error in listAttachments:", error.message);
@@ -82,11 +84,12 @@ export async function uploadAttachment(req, res) {
   try {
     const note = await noteForUser(req.params.noteId, req.user._id);
     if (!note) return res.status(404).json({ message: "Note not found" });
+    if (!canEdit(note.role)) return res.status(403).json({ message: "You do not have permission to add attachments" });
     if (!req.file) return res.status(400).json({ message: "Choose a file to attach" });
-    if (await Attachment.countDocuments({ note: note._id, user: req.user._id }) >= MAX_ATTACHMENTS_PER_NOTE) return res.status(409).json({ message: "This note has reached the 10 attachment limit" });
+    if (await Attachment.countDocuments({ note: note._id, user: note.user }) >= MAX_ATTACHMENTS_PER_NOTE) return res.status(409).json({ message: "This note has reached the 10 attachment limit" });
     const mimeType = await validateFile(req.file);
     storage = getObjectStorageClient();
-    storageKey = `attachments/${req.user._id.toString()}/${note._id.toString()}/${crypto.randomUUID()}`;
+    storageKey = `attachments/${note.user.toString()}/${note._id.toString()}/${crypto.randomUUID()}`;
     await storage.client.send(new PutObjectCommand({
       Bucket: storage.bucket,
       Key: storageKey,
@@ -97,7 +100,7 @@ export async function uploadAttachment(req, res) {
     }));
     const attachment = await Attachment.create({
       note: note._id,
-      user: req.user._id,
+      user: note.user,
       filename: safeFilename(req.file.originalname),
       mimeType,
       size: req.file.size,
@@ -114,8 +117,11 @@ export async function uploadAttachment(req, res) {
 
 export async function deleteAttachment(req, res) {
   try {
-    const attachment = await Attachment.findOne({ _id: req.params.attachmentId, user: req.user._id });
+    const attachment = await Attachment.findOne({ _id: req.params.attachmentId });
     if (!attachment) return res.status(404).json({ message: "Attachment not found" });
+    const access = await getNoteAccess(attachment.note, req.user._id, true);
+    if (!access) return res.status(404).json({ message: "Attachment not found" });
+    if (!canEdit(access.role)) return res.status(403).json({ message: "You do not have permission to delete attachments" });
     const storage = getObjectStorageClient();
     await storage.client.send(new DeleteObjectCommand({ Bucket: storage.bucket, Key: attachment.storageKey }));
     await attachment.deleteOne();

@@ -16,6 +16,11 @@ npm run test:api
 The API suite refuses to run without `TEST_MONGO_URI` and `TEST_AUTH_SECRET` and
 will not use `MONGO_URI` as a fallback.
 
+The collaboration integration suite creates disposable owner, editor, and viewer
+users, then tests invitation acceptance, editor writes, viewer write rejection,
+revocation, and expired invitations. It is skipped unless the isolated variables
+above are configured.
+
 ## Browser tests
 
 Install a browser once with `npx playwright install chromium`, then provide the

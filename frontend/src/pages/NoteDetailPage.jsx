@@ -12,6 +12,7 @@ import {
   Tags,
   Trash2,
   CornerUpLeft,
+  Share2,
 } from "lucide-react";
 import { useNavigate, useParams } from "react-router";
 import { toast } from "react-hot-toast";
@@ -22,6 +23,7 @@ import CommandPalette from "../components/CommandPalette";
 import VersionHistory from "../components/VersionHistory";
 import AttachmentPanel from "../components/AttachmentPanel";
 import AIInsightsPanel from "../components/AIInsightsPanel";
+import SharingPanel from "../components/SharingPanel";
 import api from "../lib/axios";
 import { useAuth } from "../lib/useAuth";
 import { getLocalNotesForUser } from "../lib/localNotesStore";
@@ -41,6 +43,7 @@ const NoteDetailPage = () => {
   const [focusMode, setFocusMode] = useState(false);
   const [conflictBlocked, setConflictBlocked] = useState(false);
   const [paletteOpen, setPaletteOpen] = useState(false);
+  const [sharingOpen, setSharingOpen] = useState(false);
   const savedSnapshot = useRef("");
   const hydrated = useRef(false);
 
@@ -318,6 +321,7 @@ const NoteDetailPage = () => {
                 setStatus(navigator.onLine ? "Syncing..." : "Saved locally");
               }}
             />
+            <button className="focus-toggle" onClick={() => setSharingOpen(true)}><Share2 size={15} /> Share</button>
           </div>
         </div>
         <ConflictResolutionPanel
@@ -404,6 +408,7 @@ const NoteDetailPage = () => {
           if (command === "related") document.getElementById("related-notes")?.scrollIntoView({ behavior: "smooth", block: "start" });
         }}
       />
+      <SharingPanel noteId={note._id || note.id || note.clientNoteId} open={sharingOpen} onClose={() => setSharingOpen(false)} />
     </div>
   );
 };

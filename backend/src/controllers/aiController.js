@@ -3,6 +3,7 @@ import mongoose from "mongoose";
 import { AI_MAX_RELATED_CANDIDATES } from "../config/ai.js";
 import { answerKnowledgeQuestion, generateNoteInsight } from "../services/aiService.js";
 import { rankNotes, searchTokens } from "../services/retrievalService.js";
+import { accessibleNotesFilter, getNoteAccess } from "../services/collaborationService.js";
 
 const AI_KINDS = new Set(["summarize", "suggestTags", "keyPoints", "related"]);
 
@@ -20,6 +21,7 @@ function errorResponse(error) {
   const map = {
     AI_NOT_CONFIGURED: [503, "AI is not configured"],
     AI_PROVIDER_AUTH: [502, "AI provider authentication failed"],
+    AI_PROVIDER_REQUEST: [400, "AI provider rejected the request"],
     AI_PROVIDER_ERROR: [502, "AI provider is unavailable"],
     AI_RATE_LIMIT: [429, "AI provider rate limit reached"],
     AI_TIMEOUT: [504, "AI provider timed out"],
@@ -35,11 +37,13 @@ export async function noteInsight(req, res) {
   const { kind } = req.params;
   if (!AI_KINDS.has(kind)) return res.status(400).json({ message: "Unsupported AI operation" });
   try {
-    const note = await Note.findOne(noteFilter(req.params.noteId, req.user._id)).lean();
+    const access = await getNoteAccess(req.params.noteId, req.user._id);
+    const note = access?.note;
     if (!note) return res.status(404).json({ message: "Note not found" });
     let candidates = [];
     if (kind === "related") {
-      candidates = await Note.find({ user: req.user._id, deletedAt: null, _id: { $ne: note._id } })
+      const accessible = await accessibleNotesFilter(req.user._id);
+      candidates = await Note.find({ ...accessible, _id: { $ne: note._id } })
         .select("_id title tags content")
         .sort({ updatedAt: -1 })
         .limit(AI_MAX_RELATED_CANDIDATES)
@@ -77,7 +81,7 @@ export async function askKnowledge(req, res) {
     const question = typeof req.body?.question === "string" ? req.body.question.trim() : "";
     if (!question || question.length > 1_000) return res.status(400).json({ message: "Ask a question up to 1,000 characters" });
     const tokens = searchTokens(question);
-    const query = { user: req.user._id, deletedAt: null };
+    const query = await accessibleNotesFilter(req.user._id);
     if (tokens.length) query.$or = tokens.flatMap((token) => {
       const expression = new RegExp(escapeRegex(token), "i");
       return [{ title: expression }, { tags: expression }, { content: expression }];

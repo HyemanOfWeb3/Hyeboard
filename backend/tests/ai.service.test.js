@@ -1,9 +1,11 @@
 import assert from "node:assert/strict";
 import test, { afterEach } from "node:test";
 import { answerKnowledgeQuestion, generateNoteInsight, getAIMetrics } from "../src/services/aiService.js";
+import { setGeminiTestGenerator } from "../src/services/geminiProvider.js";
 
 const originalFetch = global.fetch;
 const originalKey = process.env.AI_API_KEY;
+const originalProvider = process.env.AI_PROVIDER;
 
 function note(content = "A focused note about planning.") {
   return { title: "Planning", tags: ["work"], content };
@@ -18,6 +20,9 @@ afterEach(() => {
   if (originalKey === undefined) delete process.env.AI_API_KEY;
   else process.env.AI_API_KEY = originalKey;
   delete process.env.AI_TIMEOUT_MS;
+  if (originalProvider === undefined) delete process.env.AI_PROVIDER;
+  else process.env.AI_PROVIDER = originalProvider;
+  setGeminiTestGenerator(null);
 });
 
 test("AI service returns sanitized summary and caches duplicate requests", async () => {
@@ -124,4 +129,17 @@ test("AI metrics expose counts without prompt content", async () => {
   assert.equal(typeof snapshot.requests, "number");
   assert.equal(typeof snapshot.averageLatencyMs, "number");
   assert.equal("content" in snapshot, false);
+});
+
+test("Gemini provider adapter supplies structured JSON to the existing feature schemas", async () => {
+  process.env.AI_API_KEY = "test-only-gemini-key";
+  process.env.AI_PROVIDER = "gemini";
+  setGeminiTestGenerator(async ({ model, kind, systemInstruction }) => {
+    assert.match(model, /^gemini-/);
+    assert.equal(kind, "suggestTags");
+    assert.match(systemInstruction, /untrusted data/i);
+    return JSON.stringify({ tags: ["gemini", "notes"] });
+  });
+  const result = await generateNoteInsight({ kind: "suggestTags", note: note("unique-gemini-adapter-test") });
+  assert.deepEqual(result.tags, ["gemini", "notes"]);
 });

@@ -6,7 +6,7 @@
   "scripts": {
     "dev": "nodemon src/server.js",
     "start": "node src/server.js",
-    "test": "node --test ./tests/api.security.test.js ./tests/ai.service.test.js ./tests/retrieval.evaluation.test.js ./tests/ai.provider.integration.test.js"
+    "test": "node --test ./tests/api.security.test.js ./tests/ai.service.test.js ./tests/retrieval.evaluation.test.js ./tests/retrieval.benchmark.test.js ./tests/semantic.provider.integration.test.js ./tests/ai.provider.integration.test.js ./tests/collaboration.foundation.test.js ./tests/collaboration.integration.test.js"
   },
   "type": "module",
   "keywords": [],
@@ -15,6 +15,7 @@
   "dependencies": {
     "@aws-sdk/client-s3": "^3.1128.0",
     "@aws-sdk/s3-request-presigner": "^3.1128.0",
+    "@google/genai": "^2.21.0",
     "@upstash/ratelimit": "^2.0.5",
     "@upstash/redis": "^1.34.9",
     "bcryptjs": "^3.0.3",

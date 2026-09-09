@@ -54,3 +54,27 @@ export function evaluateRetrieval(dataset, limit = 3) {
     deletedLeaks: results.filter((result) => result.leakedDeleted).length,
   };
 }
+
+export function evaluateRetrievalByClass(dataset, limit = 3) {
+  const report = evaluateRetrieval(dataset, limit);
+  const byClass = {};
+  report.results.forEach((result) => {
+    const query = dataset.queries.find((candidate) => candidate.id === result.id);
+    const category = query?.category || "uncategorized";
+    const bucket = byClass[category] || { queries: 0, hits: 0, precision: 0, recall: 0 };
+    bucket.queries += 1;
+    bucket.hits += result.hit ? 1 : 0;
+    bucket.precision += result.precision;
+    bucket.recall += result.recall;
+    byClass[category] = bucket;
+  });
+  Object.values(byClass).forEach((bucket) => {
+    bucket.hitRate = bucket.queries ? bucket.hits / bucket.queries : 0;
+    bucket.precisionAtK = bucket.queries ? bucket.precision / bucket.queries : 0;
+    bucket.recallAtK = bucket.queries ? bucket.recall / bucket.queries : 0;
+    delete bucket.hits;
+    delete bucket.precision;
+    delete bucket.recall;
+  });
+  return { ...report, byClass };
+}

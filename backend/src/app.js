@@ -3,6 +3,7 @@ import cors from "cors";
 import notesRoutes from "./routes/notesRoutes.js";
 import attachmentsRoutes from "./routes/attachmentsRoutes.js";
 import aiRoutes from "./routes/aiRoutes.js";
+import collaborationRoutes from "./routes/collaborationRoutes.js";
 import authRoutes from "./routes/authRoutes.js";
 import { connectDB } from "./config/db.js";
 import rateLimiter from "./middleware/rateLimiter.js";
@@ -63,5 +64,6 @@ app.use("/api/auth", authRoutes);
 app.use("/api/notes", notesRoutes);
 app.use("/api/attachments", attachmentsRoutes);
 app.use("/api/ai", aiRoutes);
+app.use("/api/collaboration", collaborationRoutes);
 
 export default app;

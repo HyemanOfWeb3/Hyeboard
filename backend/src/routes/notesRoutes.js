@@ -14,6 +14,7 @@ import {
 } from "../controllers/notesController.js";
 import ratelimit from "../config/upstash.js";
 import { requireAuth } from "../middleware/auth.js";
+import { requireNoteAccess } from "../services/collaborationService.js";
 
 const router = express.Router();
 
@@ -48,9 +49,9 @@ router.get("/:id/versions", getNoteVersions);
 router.post("/:id/versions/:versionId/restore", restoreNoteVersion);
 router.get("/:id", getSelectionById);
 router.post("/", createNote);
-router.put("/:id", updateNote);
-router.delete("/:id", deleteNote);
-router.post("/:id/restore", restoreNote);
-router.delete("/:id/permanent", permanentlyDeleteNote);
+router.put("/:id", requireNoteAccess({ param: "id", edit: true }), updateNote);
+router.delete("/:id", requireNoteAccess({ param: "id", manage: true }), deleteNote);
+router.post("/:id/restore", requireNoteAccess({ param: "id", edit: true, includeDeleted: true }), restoreNote);
+router.delete("/:id/permanent", requireNoteAccess({ param: "id", manage: true, includeDeleted: true }), permanentlyDeleteNote);
 
 export default router;

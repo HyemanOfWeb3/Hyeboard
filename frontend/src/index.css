@@ -312,6 +312,23 @@
 .assistant-sources a { display: flex; align-items: center; justify-content: space-between; gap: 8px; padding: 8px; border: 1px solid var(--border); border-radius: 6px; color: var(--accent-strong); font-size: 12px; text-decoration: none; }
 .assistant-sources a:hover { border-color: rgba(128,242,156,.4); background: rgba(128,242,156,.06); }
 .assistant-disclaimer { display: block; margin-top: 14px; }
+.sharing-overlay { position: fixed; inset: 0; z-index: 56; display: grid; place-items: start end; padding: 88px 24px 24px; background: rgba(0,0,0,.35); }
+.sharing-panel { width: min(460px, 100%); max-height: calc(100vh - 112px); overflow: auto; padding: 20px; border: 1px solid var(--border); border-radius: 10px; background: var(--surface-raised); box-shadow: 0 24px 70px rgba(0,0,0,.42); }
+.sharing-panel__header { display: flex; justify-content: space-between; gap: 14px; }
+.sharing-panel__header .eyebrow { display: inline-flex; align-items: center; gap: 5px; }
+.sharing-panel__header h2 { margin: 7px 0 4px; font-size: 25px; letter-spacing: -.04em; }
+.sharing-panel__header p { margin: 0; color: var(--muted); font-size: 12px; }
+.sharing-form { display: grid; grid-template-columns: 1fr auto auto; gap: 7px; margin-top: 20px; }
+.sharing-form input, .sharing-form select { min-width: 0; padding: 9px; border: 1px solid var(--border); border-radius: 6px; color: var(--text); background: var(--surface); }
+.sharing-form .primary-button { justify-content: center; }
+.sharing-invite { display: grid; gap: 5px; margin-top: 14px; padding: 10px; border: 1px solid rgba(128,242,156,.35); border-radius: 7px; }
+.sharing-invite code { overflow-wrap: anywhere; color: var(--accent-strong); font-size: 11px; }
+.sharing-invite small, .sharing-member small { color: var(--muted); font-size: 10px; }
+.sharing-members { display: grid; gap: 7px; margin-top: 18px; }
+.sharing-member { display: flex; align-items: center; gap: 9px; padding: 9px; border: 1px solid var(--border); border-radius: 7px; }
+.sharing-member > div { display: grid; gap: 3px; flex: 1; min-width: 0; }
+.sharing-member strong { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+@media (max-width: 600px) { .sharing-overlay { padding: 72px 10px 10px; }.sharing-form { grid-template-columns: 1fr; }.sharing-form .primary-button { width: 100%; } }
 
 .relationship-filter {
   max-width: 1100px;
