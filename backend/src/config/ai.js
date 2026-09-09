@@ -9,7 +9,8 @@ export const GEMINI_MODEL = "gemini-2.5-flash";
 
 export function getAIConfig() {
   const provider = String(process.env.AI_PROVIDER || "").toLowerCase();
-  const isGemini = provider === "gemini" || Boolean(process.env.GEMINI_API_KEY);
+  const configuredUrl = process.env.AI_API_URL || "";
+  const isGemini = provider === "gemini" || Boolean(process.env.GEMINI_API_KEY) || configuredUrl.includes("generativelanguage.googleapis.com");
   return {
     apiKey: process.env.AI_API_KEY || process.env.GEMINI_API_KEY || "",
     apiUrl: process.env.AI_API_URL || (isGemini ? GEMINI_API_URL : DEFAULT_AI_API_URL),

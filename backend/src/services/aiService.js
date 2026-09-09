@@ -155,7 +155,7 @@ export async function generateNoteInsight({ kind, note, candidates = [] }) {
       if (response.status === 401 || response.status === 403) throw Object.assign(new Error("AI provider authentication failed"), { code: "AI_PROVIDER_AUTH" });
       if (!response.ok) {
         const requestId = response.headers.get("x-request-id") || response.headers.get("x-goog-request-id") || "unavailable";
-        console.error("AI provider request failed", { provider: config.provider, model: config.model, status: response.status, requestId });
+        console.error("AI provider request failed", { provider: config.provider, apiUrl: config.apiUrl, model: config.model, status: response.status, requestId });
         throw Object.assign(new Error("AI provider unavailable"), { code: "AI_PROVIDER_ERROR" });
       }
       const value = sanitizeResult(parseProviderResponse(await response.json(), kind), kind, safeCandidates);
@@ -239,7 +239,7 @@ export async function answerKnowledgeQuestion({ question, sources = [] }) {
       if (response.status === 401 || response.status === 403) throw Object.assign(new Error("AI provider authentication failed"), { code: "AI_PROVIDER_AUTH" });
       if (!response.ok) {
         const requestId = response.headers.get("x-request-id") || response.headers.get("x-goog-request-id") || "unavailable";
-        console.error("AI provider request failed", { provider: config.provider, model: config.model, status: response.status, requestId });
+        console.error("AI provider request failed", { provider: config.provider, apiUrl: config.apiUrl, model: config.model, status: response.status, requestId });
         throw Object.assign(new Error("AI provider unavailable"), { code: "AI_PROVIDER_ERROR" });
       }
       const parsed = parseAssistantResponse(await response.json());
