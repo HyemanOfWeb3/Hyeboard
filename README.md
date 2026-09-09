@@ -63,11 +63,14 @@ A full-stack web application for creating, reading, updating, and deleting notes
    # Optional for non-AWS S3-compatible providers
    S3_ENDPOINT=https://your-storage-endpoint
    S3_FORCE_PATH_STYLE=false
-   # Optional server-side AI provider configuration
-   AI_API_KEY=server_only_provider_key
-   AI_API_URL=https://api.openai.com/v1/chat/completions
-   AI_MODEL=gpt-4o-mini
-   AI_TIMEOUT_MS=15000
+      # Optional server-side AI provider configuration
+      AI_PROVIDER=gemini
+      GEMINI_API_KEY=server_only_provider_key
+      AI_API_URL=https://generativelanguage.googleapis.com/v1beta/openai/chat/completions
+      AI_MODEL=gemini-2.5-flash
+      AI_TIMEOUT_MS=15000
+      AI_SITE_URL=https://hyeboard.vercel.app
+      AI_SITE_NAME=HyeBoard
    PORT=5000
    ```
 
@@ -116,7 +119,21 @@ used only to prevent duplicate requests on one server instance. Note content is
 treated as untrusted data, and AI suggestions never create links or edit tags
 automatically. AI is limited to five requests per user per five minutes, is
 unavailable offline, and the rest of the note app continues to work when no
-provider key is configured.
+provider key is configured. The default provider is OpenRouter's `openrouter/free`
+router, which selects an available free model. You may set `AI_MODEL` to a specific
+OpenRouter model ending in `:free` when desired. Free models are subject to provider
+availability, quotas, latency, and quality limits.
+
+### Collaboration foundation
+
+Collaboration currently provides the control plane only; rich-text collaborative
+editing is intentionally not enabled. Notes can have owner-managed editor/viewer
+members, expiring invitations, revocation, owner-only audit history, and
+permission-filtered persisted mutation events. The event stream uses authenticated
+Server-Sent Events with database polling because the current Vercel deployment does
+not provide a durable WebSocket process. Offline edits remain subject to server
+authorization when they reconnect. Editors may read and edit shared notes; viewers
+are read-only; only owners may invite, revoke, delete, or inspect audit logs.
 
 ### Authentication and migration
 

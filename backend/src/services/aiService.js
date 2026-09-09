@@ -134,7 +134,12 @@ export async function generateNoteInsight({ kind, note, candidates = [] }) {
     try {
       const response = await fetch(config.apiUrl, {
         method: "POST",
-        headers: { "Content-Type": "application/json", Authorization: `Bearer ${config.apiKey}` },
+        headers: {
+          "Content-Type": "application/json",
+          Authorization: `Bearer ${config.apiKey}`,
+          "HTTP-Referer": config.siteUrl,
+          "X-Title": config.siteName,
+        },
         body: JSON.stringify({
           model: config.model,
           temperature: 0.2,
@@ -148,7 +153,11 @@ export async function generateNoteInsight({ kind, note, candidates = [] }) {
       });
       if (response.status === 429) throw Object.assign(new Error("AI provider rate limit"), { code: "AI_RATE_LIMIT" });
       if (response.status === 401 || response.status === 403) throw Object.assign(new Error("AI provider authentication failed"), { code: "AI_PROVIDER_AUTH" });
-      if (!response.ok) throw Object.assign(new Error("AI provider unavailable"), { code: "AI_PROVIDER_ERROR" });
+      if (!response.ok) {
+        const requestId = response.headers.get("x-request-id") || response.headers.get("x-goog-request-id") || "unavailable";
+        console.error("AI provider request failed", { provider: config.provider, model: config.model, status: response.status, requestId });
+        throw Object.assign(new Error("AI provider unavailable"), { code: "AI_PROVIDER_ERROR" });
+      }
       const value = sanitizeResult(parseProviderResponse(await response.json(), kind), kind, safeCandidates);
       cache.set(key, { value, expiresAt: Date.now() + AI_CACHE_TTL_MS });
       if (cache.size > 100) cache.delete(cache.keys().next().value);
@@ -209,7 +218,12 @@ export async function answerKnowledgeQuestion({ question, sources = [] }) {
     try {
       const response = await fetch(config.apiUrl, {
         method: "POST",
-        headers: { "Content-Type": "application/json", Authorization: `Bearer ${config.apiKey}` },
+        headers: {
+          "Content-Type": "application/json",
+          Authorization: `Bearer ${config.apiKey}`,
+          "HTTP-Referer": config.siteUrl,
+          "X-Title": config.siteName,
+        },
         body: JSON.stringify({
           model: config.model,
           temperature: 0.1,
@@ -223,7 +237,11 @@ export async function answerKnowledgeQuestion({ question, sources = [] }) {
       });
       if (response.status === 429) throw Object.assign(new Error("AI provider rate limit"), { code: "AI_RATE_LIMIT" });
       if (response.status === 401 || response.status === 403) throw Object.assign(new Error("AI provider authentication failed"), { code: "AI_PROVIDER_AUTH" });
-      if (!response.ok) throw Object.assign(new Error("AI provider unavailable"), { code: "AI_PROVIDER_ERROR" });
+      if (!response.ok) {
+        const requestId = response.headers.get("x-request-id") || response.headers.get("x-goog-request-id") || "unavailable";
+        console.error("AI provider request failed", { provider: config.provider, model: config.model, status: response.status, requestId });
+        throw Object.assign(new Error("AI provider unavailable"), { code: "AI_PROVIDER_ERROR" });
+      }
       const parsed = parseAssistantResponse(await response.json());
       const allowed = new Set(safeSources.map((source) => source.key));
       const value = {
