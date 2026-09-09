@@ -1,12 +1,11 @@
-import { GoogleGenAI, Type } from "@google/genai";
-
 let testGenerator = null;
 
 export function setGeminiTestGenerator(generator) {
   testGenerator = generator;
 }
 
-const schemas = {
+function buildSchemas(Type) {
+  return {
   summarize: {
     type: Type.OBJECT,
     properties: {
@@ -48,7 +47,8 @@ const schemas = {
     },
     required: ["answer", "sourceKeys", "uncertainty"],
   },
-};
+  };
+}
 
 function classifyGeminiError(error) {
   const status = Number(error?.status || error?.statusCode || error?.code || 0);
@@ -60,6 +60,8 @@ function classifyGeminiError(error) {
 
 export async function generateGeminiJson({ apiKey, model, kind, systemInstruction, userContent, timeoutMs }) {
   if (testGenerator) return testGenerator({ apiKey, model, kind, systemInstruction, userContent });
+  const { GoogleGenAI, Type } = await import("@google/genai");
+  const schema = buildSchemas(Type)[kind];
   const ai = new GoogleGenAI({ apiKey });
   const request = ai.models.generateContent({
     model,
@@ -68,7 +70,7 @@ export async function generateGeminiJson({ apiKey, model, kind, systemInstructio
       systemInstruction,
       temperature: kind === "assistant" ? 0.1 : 0.2,
       responseMimeType: "application/json",
-      responseSchema: schemas[kind],
+      responseSchema: schema,
     },
   });
   try {
