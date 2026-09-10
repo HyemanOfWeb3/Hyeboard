@@ -35,7 +35,12 @@ const Navbar = ({ onSearch, onNewNote, onMenu, onAssistant }) => {
                 <Command size={12} />K
               </kbd>
             </button>
-            <button className="icon-button" onClick={onAssistant} aria-label="Open knowledge assistant" title="Ask your notes">
+            <button
+              className="icon-button"
+              onClick={onAssistant}
+              aria-label="Open knowledge assistant"
+              title="Ask your notes"
+            >
               <Brain size={18} />
             </button>
             <Link to={"/create"} onClick={onNewNote} className="primary-button">

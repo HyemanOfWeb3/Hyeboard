@@ -3,7 +3,12 @@ import Mutation from "../models/Mutation.js";
 import NoteVersion from "../models/NoteVersion.js";
 import { deleteAttachmentsForNote } from "./attachmentsController.js";
 import mongoose from "mongoose";
-import { accessibleNotesFilter, getNoteAccess, requireNoteAccess, writeCollaborationEvent } from "../services/collaborationService.js";
+import {
+  accessibleNotesFilter,
+  getNoteAccess,
+  requireNoteAccess,
+  writeCollaborationEvent,
+} from "../services/collaborationService.js";
 
 function noteReferenceFilter(reference, userId, includeDeleted = false) {
   const ownership = { user: userId };
@@ -122,9 +127,9 @@ export async function getAllNotes(req, res) {
   // send the notes
   // res.status(200).send("You just fetched the notes");
   try {
-    const notes = await Note.find(await accessibleNotesFilter(req.user._id)).sort(
-      { updatedAt: -1 },
-    );
+    const notes = await Note.find(
+      await accessibleNotesFilter(req.user._id),
+    ).sort({ updatedAt: -1 });
     res.status(200).json(notes);
   } catch (error) {
     console.error("Error in getAllNotes:", error.message);
@@ -154,7 +159,9 @@ export async function getNoteVersions(req, res) {
     const versions = await NoteVersion.find({ note: note._id })
       .sort({ revision: -1 })
       .limit(100)
-      .select("revision title content tags isPinned isFavorite deletedAt operationType createdAt updatedAt");
+      .select(
+        "revision title content tags isPinned isFavorite deletedAt operationType createdAt updatedAt",
+      );
     res.status(200).json(versions);
   } catch (error) {
     console.error("Error in getNoteVersions:", error.message);
@@ -170,25 +177,56 @@ export async function restoreNoteVersion(req, res) {
       const note = access?.note;
       if (!note) return { status: 404, body: { message: "Note not found" } };
       if (baseRevision !== undefined && note.revision !== baseRevision) {
-        return { status: 409, body: { code: "REVISION_CONFLICT", message: "The note changed elsewhere", serverNote: note } };
+        return {
+          status: 409,
+          body: {
+            code: "REVISION_CONFLICT",
+            message: "The note changed elsewhere",
+            serverNote: note,
+          },
+        };
       }
-      if (access.role !== "owner" && access.role !== "editor") return { status: 403, body: { message: "You do not have permission for this note" } };
+      if (access.role !== "owner" && access.role !== "editor")
+        return {
+          status: 403,
+          body: { message: "You do not have permission for this note" },
+        };
       const version = await NoteVersion.findOne({
         _id: req.params.versionId,
         note: note._id,
       });
-      if (!version) return { status: 404, body: { message: "Version not found" } };
+      if (!version)
+        return { status: 404, body: { message: "Version not found" } };
       await saveVersion(note, "RESTORE_VERSION");
       const updatedNote = await Note.findOneAndUpdate(
         { _id: note._id, user: req.user._id, revision: note.revision },
-        { $set: { title: version.title, content: version.content, tags: version.tags, isPinned: version.isPinned, isFavorite: version.isFavorite, deletedAt: version.deletedAt || null }, $inc: { revision: 1 } },
+        {
+          $set: {
+            title: version.title,
+            content: version.content,
+            tags: version.tags,
+            isPinned: version.isPinned,
+            isFavorite: version.isFavorite,
+            deletedAt: version.deletedAt || null,
+          },
+          $inc: { revision: 1 },
+        },
         { new: true, runValidators: true },
       );
-      if (!updatedNote) return { status: 409, body: { code: "REVISION_CONFLICT", message: "The note changed elsewhere", serverNote: await Note.findById(note._id) } };
+      if (!updatedNote)
+        return {
+          status: 409,
+          body: {
+            code: "REVISION_CONFLICT",
+            message: "The note changed elsewhere",
+            serverNote: await Note.findById(note._id),
+          },
+        };
       return { status: 200, body: updatedNote };
     };
     const result = await runIdempotentMutation(req, res, restore);
-    if (result?.status === 409 && result.body?.code === "REVISION_CONFLICT") return result;
+    if (result?.status === 409 && result.body?.code === "REVISION_CONFLICT")
+      return result;
     return result;
   } catch (error) {
     console.error("Error in restoreNoteVersion:", error.message);
@@ -199,7 +237,14 @@ export async function restoreNoteVersion(req, res) {
 export async function createNote(req, res) {
   // create a new note
   try {
-    const { title, content, tags = [], clientNoteId, isPinned, isFavorite } = req.body;
+    const {
+      title,
+      content,
+      tags = [],
+      clientNoteId,
+      isPinned,
+      isFavorite,
+    } = req.body;
     const create = async () => {
       if (clientNoteId) {
         const existing = await Note.findOne({
@@ -245,8 +290,16 @@ export async function updateNote(req, res) {
       const currentNote = await Note.findOne(filter);
       if (!currentNote) {
         const existingNote = await Note.findById(req.noteAccess.note._id);
-        if (!existingNote) return { status: 404, body: { message: "Note not found" } };
-        return { status: 409, body: { code: "REVISION_CONFLICT", message: "The note changed elsewhere", serverNote: existingNote } };
+        if (!existingNote)
+          return { status: 404, body: { message: "Note not found" } };
+        return {
+          status: 409,
+          body: {
+            code: "REVISION_CONFLICT",
+            message: "The note changed elsewhere",
+            serverNote: existingNote,
+          },
+        };
       }
       await saveVersion(currentNote, "UPDATE_NOTE");
       const updatedNote = await Note.findOneAndUpdate(
@@ -255,14 +308,24 @@ export async function updateNote(req, res) {
         { new: true, runValidators: true },
       );
       if (updatedNote) {
-        await writeAudit({ actor: req.user._id, note: updatedNote._id, action: "note.updated", metadata: { revision: updatedNote.revision } });
-        await writeCollaborationEvent({ actor: req.user._id, note: updatedNote._id, type: "note.updated", revision: updatedNote.revision });
+        await writeAudit({
+          actor: req.user._id,
+          note: updatedNote._id,
+          action: "note.updated",
+          metadata: { revision: updatedNote.revision },
+        });
+        await writeCollaborationEvent({
+          actor: req.user._id,
+          note: updatedNote._id,
+          type: "note.updated",
+          revision: updatedNote.revision,
+        });
         return { status: 200, body: updatedNote };
       }
 
-      const existingNoteAfter = await Note.findOne(
-        { _id: req.noteAccess.note._id },
-      );
+      const existingNoteAfter = await Note.findOne({
+        _id: req.noteAccess.note._id,
+      });
       if (!existingNoteAfter)
         return { status: 404, body: { message: "Note not found" } };
       if (baseRevision !== undefined) {
@@ -309,13 +372,21 @@ export async function deleteNote(req, res) {
       );
       if (deletedNote) {
         await saveVersion(deletedNote, "DELETE_NOTE");
-        await writeAudit({ actor: req.user._id, note: deletedNote._id, action: "note.deleted", metadata: { revision: deletedNote.revision } });
-        await writeCollaborationEvent({ actor: req.user._id, note: deletedNote._id, type: "note.deleted", revision: deletedNote.revision });
+        await writeAudit({
+          actor: req.user._id,
+          note: deletedNote._id,
+          action: "note.deleted",
+          metadata: { revision: deletedNote.revision },
+        });
+        await writeCollaborationEvent({
+          actor: req.user._id,
+          note: deletedNote._id,
+          type: "note.deleted",
+          revision: deletedNote.revision,
+        });
         return { status: 200, body: deletedNote };
       }
-      const currentNote = await Note.findOne(
-        { _id: req.noteAccess.note._id },
-      );
+      const currentNote = await Note.findOne({ _id: req.noteAccess.note._id });
       if (!currentNote)
         return { status: 404, body: { message: "Note not found" } };
       if (baseRevision !== undefined && currentNote.revision !== baseRevision)
@@ -366,13 +437,21 @@ export async function restoreNote(req, res) {
       );
       if (note) {
         await saveVersion(note, "RESTORE_NOTE");
-        await writeAudit({ actor: req.user._id, note: note._id, action: "note.restored", metadata: { revision: note.revision } });
-        await writeCollaborationEvent({ actor: req.user._id, note: note._id, type: "note.restored", revision: note.revision });
+        await writeAudit({
+          actor: req.user._id,
+          note: note._id,
+          action: "note.restored",
+          metadata: { revision: note.revision },
+        });
+        await writeCollaborationEvent({
+          actor: req.user._id,
+          note: note._id,
+          type: "note.restored",
+          revision: note.revision,
+        });
         return { status: 200, body: note };
       }
-      const currentNote = await Note.findOne(
-        { _id: req.noteAccess.note._id },
-      );
+      const currentNote = await Note.findOne({ _id: req.noteAccess.note._id });
       if (!currentNote)
         return { status: 404, body: { message: "Note not found" } };
       return {
@@ -411,8 +490,13 @@ export async function permanentlyDeleteNote(req, res) {
 
 export async function emptyTrash(req, res) {
   try {
-    const notes = await Note.find({ user: req.user._id, deletedAt: { $ne: null } }).select("_id");
-    await Promise.all(notes.map((note) => deleteAttachmentsForNote(note._id, req.user._id)));
+    const notes = await Note.find({
+      user: req.user._id,
+      deletedAt: { $ne: null },
+    }).select("_id");
+    await Promise.all(
+      notes.map((note) => deleteAttachmentsForNote(note._id, req.user._id)),
+    );
     await Note.deleteMany({ user: req.user._id, deletedAt: { $ne: null } });
     res.status(200).json({ message: "Trash emptied" });
   } catch (error) {

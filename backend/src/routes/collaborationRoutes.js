@@ -15,9 +15,21 @@ const router = express.Router();
 router.use(requireAuth);
 router.post("/invitations/accept", acceptInvitation);
 router.post("/notes/:noteId/invitations", requireManageNote, createInvitation);
-router.get("/notes/:noteId/members", requireNoteAccess({ param: "noteId" }), listMembers);
-router.delete("/notes/:noteId/members/:userId", requireManageNote, revokeMember);
-router.get("/notes/:noteId/events", requireNoteAccess({ param: "noteId" }), streamEvents);
+router.get(
+  "/notes/:noteId/members",
+  requireNoteAccess({ param: "noteId" }),
+  listMembers,
+);
+router.delete(
+  "/notes/:noteId/members/:userId",
+  requireManageNote,
+  revokeMember,
+);
+router.get(
+  "/notes/:noteId/events",
+  requireNoteAccess({ param: "noteId" }),
+  streamEvents,
+);
 router.get("/notes/:noteId/audit", listNoteAuditLogs);
 
 export default router;

@@ -1,6 +1,13 @@
 import assert from "node:assert/strict";
 import test from "node:test";
-import { canEdit, canManage, canRead, createInviteToken, hashInviteToken, ROLES } from "../src/services/collaborationService.js";
+import {
+  canEdit,
+  canManage,
+  canRead,
+  createInviteToken,
+  hashInviteToken,
+  ROLES,
+} from "../src/services/collaborationService.js";
 
 test("collaboration roles have explicit permissions", () => {
   assert.equal(canRead(ROLES.OWNER), true);

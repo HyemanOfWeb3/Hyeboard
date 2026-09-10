@@ -13,6 +13,9 @@ import {
   Trash2,
   CornerUpLeft,
   Share2,
+  Sparkles,
+  ListChecks,
+  Lightbulb,
 } from "lucide-react";
 import { useNavigate, useParams } from "react-router";
 import { toast } from "react-hot-toast";
@@ -44,6 +47,8 @@ const NoteDetailPage = () => {
   const [conflictBlocked, setConflictBlocked] = useState(false);
   const [paletteOpen, setPaletteOpen] = useState(false);
   const [sharingOpen, setSharingOpen] = useState(false);
+  const [aiOpen, setAiOpen] = useState(false);
+  const [requestedAIAction, setRequestedAIAction] = useState("");
   const savedSnapshot = useRef("");
   const hydrated = useRef(false);
 
@@ -269,7 +274,11 @@ const NoteDetailPage = () => {
               {status === "Saved" && <Check size={14} />}
               {status}
             </span>
-            <button className="icon-button" aria-label="More actions" onClick={() => setPaletteOpen(true)}>
+            <button
+              className="icon-button"
+              aria-label="More actions"
+              onClick={() => setPaletteOpen(true)}
+            >
               <Ellipsis size={19} />
             </button>
           </div>
@@ -321,7 +330,12 @@ const NoteDetailPage = () => {
                 setStatus(navigator.onLine ? "Syncing..." : "Saved locally");
               }}
             />
-            <button className="focus-toggle" onClick={() => setSharingOpen(true)}><Share2 size={15} /> Share</button>
+            <button
+              className="focus-toggle"
+              onClick={() => setSharingOpen(true)}
+            >
+              <Share2 size={15} /> Share
+            </button>
           </div>
         </div>
         <ConflictResolutionPanel
@@ -376,7 +390,13 @@ const NoteDetailPage = () => {
             userId={user?.id || user?._id}
           />
           <AttachmentPanel noteId={note._id || note.id || note.clientNoteId} />
-          <AIInsightsPanel noteId={note._id || note.id || note.clientNoteId} />
+          <AIInsightsPanel
+            noteId={note._id || note.id || note.clientNoteId}
+            open={aiOpen}
+            onOpenChange={setAiOpen}
+            requestedAction={requestedAIAction}
+            onRequestedActionHandled={() => setRequestedAIAction("")}
+          />
           <footer className="editor-footer">
             <button className="delete-button" onClick={deleteNote}>
               <Trash2 size={16} /> Move to trash
@@ -399,16 +419,40 @@ const NoteDetailPage = () => {
           ["backlinks", "Show backlinks", CornerUpLeft],
           ["related", "Open related notes", Tags],
           ["graph", "Open note graph", Network],
+          ["ai-summarize", "Summarize current note", Sparkles],
+          ["ai-keyPoints", "Extract key points", ListChecks],
+          ["ai-suggestTags", "Suggest title and tags", Tags],
+          ["ai-related", "Find note connections", Lightbulb],
+          ["ai-cleanUp", "Clean up current note", Sparkles],
+          ["ai-checklist", "Make checklist", ListChecks],
+          ["ai-titleTags", "Suggest title and tags", Tags],
         ]}
         onCommand={(command) => {
           setPaletteOpen(false);
+          if (command.startsWith("ai-")) {
+            setRequestedAIAction(command.slice(3));
+            setAiOpen(true);
+          }
           if (command === "graph") navigate(`/graph/${encodeURIComponent(id)}`);
-          if (command === "linked") document.getElementById("linked-notes")?.scrollIntoView({ behavior: "smooth", block: "start" });
-          if (command === "backlinks") document.getElementById("backlinks")?.scrollIntoView({ behavior: "smooth", block: "start" });
-          if (command === "related") document.getElementById("related-notes")?.scrollIntoView({ behavior: "smooth", block: "start" });
+          if (command === "linked")
+            document
+              .getElementById("linked-notes")
+              ?.scrollIntoView({ behavior: "smooth", block: "start" });
+          if (command === "backlinks")
+            document
+              .getElementById("backlinks")
+              ?.scrollIntoView({ behavior: "smooth", block: "start" });
+          if (command === "related")
+            document
+              .getElementById("related-notes")
+              ?.scrollIntoView({ behavior: "smooth", block: "start" });
         }}
       />
-      <SharingPanel noteId={note._id || note.id || note.clientNoteId} open={sharingOpen} onClose={() => setSharingOpen(false)} />
+      <SharingPanel
+        noteId={note._id || note.id || note.clientNoteId}
+        open={sharingOpen}
+        onClose={() => setSharingOpen(false)}
+      />
     </div>
   );
 };

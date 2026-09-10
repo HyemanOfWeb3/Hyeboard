@@ -54,7 +54,11 @@ function resolveNoteReferences(notes, references) {
   const matches = new Map();
   notes.forEach((note) => {
     if (!note || note.deletedAt) return;
-    if (getNoteIdentityValues(note).some((reference) => referenceSet.has(reference))) {
+    if (
+      getNoteIdentityValues(note).some((reference) =>
+        referenceSet.has(reference),
+      )
+    ) {
       matches.set(getNoteReference(note), note);
     }
   });
@@ -64,10 +68,15 @@ function resolveNoteReferences(notes, references) {
 export function deriveOutgoingLinks(notes = [], sourceNote) {
   if (!sourceNote) return [];
   const links = parseInternalLinks(sourceNote.content);
-  const resolved = resolveNoteReferences(notes, links.map((link) => link.reference));
+  const resolved = resolveNoteReferences(
+    notes,
+    links.map((link) => link.reference),
+  );
   const resolvedByReference = new Map();
   resolved.forEach((note) => {
-    getNoteIdentityValues(note).forEach((reference) => resolvedByReference.set(reference, note));
+    getNoteIdentityValues(note).forEach((reference) =>
+      resolvedByReference.set(reference, note),
+    );
   });
   const unique = new Map();
   links.forEach((link) => {
@@ -87,9 +96,12 @@ export function deriveBacklinks(notes = [], targetNote) {
   notes.forEach((sourceNote) => {
     if (!sourceNote || sourceNote.deletedAt) return;
     const sourceReferences = getNoteIdentityValues(sourceNote);
-    if (sourceReferences.some((reference) => targetReferences.has(reference))) return;
+    if (sourceReferences.some((reference) => targetReferences.has(reference)))
+      return;
     const links = parseInternalLinks(sourceNote.content);
-    const pointsToTarget = links.some((link) => targetReferences.has(link.reference));
+    const pointsToTarget = links.some((link) =>
+      targetReferences.has(link.reference),
+    );
     if (!pointsToTarget) return;
     const sourceIdentity = sourceReferences[0];
     if (sourceIdentity) backlinks.set(sourceIdentity, sourceNote);
@@ -103,17 +115,40 @@ export function deriveBacklinks(notes = [], targetNote) {
 export function deriveRelatedNotes(notes = [], targetNote) {
   if (!targetNote) return [];
   const targetReferences = new Set(getNoteIdentityValues(targetNote));
-  const outgoing = new Set(deriveOutgoingLinks(notes, targetNote).map(getNoteReference));
-  const backlinks = new Set(deriveBacklinks(notes, targetNote).map(getNoteReference));
-  const targetTags = new Set((targetNote.tags || []).map((tag) => String(tag).trim().toLowerCase()).filter(Boolean));
+  const outgoing = new Set(
+    deriveOutgoingLinks(notes, targetNote).map(getNoteReference),
+  );
+  const backlinks = new Set(
+    deriveBacklinks(notes, targetNote).map(getNoteReference),
+  );
+  const targetTags = new Set(
+    (targetNote.tags || [])
+      .map((tag) => String(tag).trim().toLowerCase())
+      .filter(Boolean),
+  );
   if (!targetTags.size) return [];
 
   return notes
     .filter((note) => note && !note.deletedAt)
-    .filter((note) => !getNoteIdentityValues(note).some((reference) => targetReferences.has(reference)))
-    .filter((note) => !outgoing.has(getNoteReference(note)) && !backlinks.has(getNoteReference(note)))
-    .filter((note) => (note.tags || []).some((tag) => targetTags.has(String(tag).trim().toLowerCase())))
-    .sort((left, right) => String(left.title || "").localeCompare(String(right.title || "")));
+    .filter(
+      (note) =>
+        !getNoteIdentityValues(note).some((reference) =>
+          targetReferences.has(reference),
+        ),
+    )
+    .filter(
+      (note) =>
+        !outgoing.has(getNoteReference(note)) &&
+        !backlinks.has(getNoteReference(note)),
+    )
+    .filter((note) =>
+      (note.tags || []).some((tag) =>
+        targetTags.has(String(tag).trim().toLowerCase()),
+      ),
+    )
+    .sort((left, right) =>
+      String(left.title || "").localeCompare(String(right.title || "")),
+    );
 }
 
 export function deriveOrphanNotes(notes = []) {
@@ -124,7 +159,9 @@ export function deriveOrphanNotes(notes = []) {
     connectedIds.add(edge.source);
     connectedIds.add(edge.target);
   });
-  return activeNotes.filter((note) => !connectedIds.has(getNoteReference(note)));
+  return activeNotes.filter(
+    (note) => !connectedIds.has(getNoteReference(note)),
+  );
 }
 
 export function deriveNoteGraph(notes = [], options = {}) {
@@ -163,8 +200,14 @@ export function deriveNoteGraph(notes = [], options = {}) {
     const distances = new Map([[centerId, 0]]);
     const adjacency = new Map();
     edges.forEach((edge) => {
-      adjacency.set(edge.source, [...(adjacency.get(edge.source) || []), edge.target]);
-      adjacency.set(edge.target, [...(adjacency.get(edge.target) || []), edge.source]);
+      adjacency.set(edge.source, [
+        ...(adjacency.get(edge.source) || []),
+        edge.target,
+      ]);
+      adjacency.set(edge.target, [
+        ...(adjacency.get(edge.target) || []),
+        edge.source,
+      ]);
     });
     const queue = [centerId];
     while (queue.length) {
@@ -179,13 +222,19 @@ export function deriveNoteGraph(notes = [], options = {}) {
       });
     }
     const visibleIds = new Set(distances.keys());
-    visibleNotes = activeNotes.filter((note) => visibleIds.has(getNoteReference(note)));
-    edges = edges.filter((edge) => visibleIds.has(edge.source) && visibleIds.has(edge.target));
+    visibleNotes = activeNotes.filter((note) =>
+      visibleIds.has(getNoteReference(note)),
+    );
+    edges = edges.filter(
+      (edge) => visibleIds.has(edge.source) && visibleIds.has(edge.target),
+    );
   }
 
   const limitedNotes = visibleNotes.slice(0, options.maxNodes || 120);
   const limitedIds = new Set(limitedNotes.map(getNoteReference));
-  edges = edges.filter((edge) => limitedIds.has(edge.source) && limitedIds.has(edge.target));
+  edges = edges.filter(
+    (edge) => limitedIds.has(edge.source) && limitedIds.has(edge.target),
+  );
   const outgoing = new Map();
   const incoming = new Map();
   edges.forEach((edge) => {

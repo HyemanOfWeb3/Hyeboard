@@ -38,32 +38,57 @@ before(async () => {
   });
   agentA = request.agent(app);
   agentB = request.agent(app);
-  await agentA.post("/api/auth/login").send({ email: userA.email, password: "test-password-a-123" }).expect(200);
-  await agentB.post("/api/auth/login").send({ email: userB.email, password: "test-password-a-123" }).expect(200);
+  await agentA
+    .post("/api/auth/login")
+    .send({ email: userA.email, password: "test-password-a-123" })
+    .expect(200);
+  await agentB
+    .post("/api/auth/login")
+    .send({ email: userB.email, password: "test-password-a-123" })
+    .expect(200);
 });
 
 after(async () => {
   if (mongoose.connection.readyState) await mongoose.disconnect();
 });
 
-test("authenticated users cannot read another user's note", { skip: !enabled }, async () => {
-  await agentA.get(`/api/notes/${privateNote._id}`).expect(200);
-  const response = await agentB.get(`/api/notes/${privateNote._id}`).expect(404);
-  assert.equal(response.body.message, "Note not found");
-});
+test(
+  "authenticated users cannot read another user's note",
+  { skip: !enabled },
+  async () => {
+    await agentA.get(`/api/notes/${privateNote._id}`).expect(200);
+    const response = await agentB
+      .get(`/api/notes/${privateNote._id}`)
+      .expect(404);
+    assert.equal(response.body.message, "Note not found");
+  },
+);
 
-test("authenticated users cannot mutate another user's note", { skip: !enabled }, async () => {
-  await agentB.put(`/api/notes/${privateNote._id}`).send({
-    title: "Tampered",
-    content: "Should not apply",
-    baseRevision: 1,
-    operationId: "e2e-cross-user-update",
-  }).expect(404);
-  const note = await Note.findById(privateNote._id).lean();
-  assert.equal(note.title, "Private A");
-});
+test(
+  "authenticated users cannot mutate another user's note",
+  { skip: !enabled },
+  async () => {
+    await agentB
+      .put(`/api/notes/${privateNote._id}`)
+      .send({
+        title: "Tampered",
+        content: "Should not apply",
+        baseRevision: 1,
+        operationId: "e2e-cross-user-update",
+      })
+      .expect(404);
+    const note = await Note.findById(privateNote._id).lean();
+    assert.equal(note.title, "Private A");
+  },
+);
 
-test("unauthenticated note and attachment routes are rejected", { skip: !enabled }, async () => {
-  await request(app).get(`/api/notes/${privateNote._id}`).expect(401);
-  await request(app).get(`/api/attachments/note/${privateNote._id}`).expect(401);
-});
+test(
+  "unauthenticated note and attachment routes are rejected",
+  { skip: !enabled },
+  async () => {
+    await request(app).get(`/api/notes/${privateNote._id}`).expect(401);
+    await request(app)
+      .get(`/api/attachments/note/${privateNote._id}`)
+      .expect(401);
+  },
+);

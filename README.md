@@ -67,7 +67,7 @@ A full-stack web application for creating, reading, updating, and deleting notes
       AI_PROVIDER=gemini
       GEMINI_API_KEY=server_only_provider_key
       AI_API_URL=https://generativelanguage.googleapis.com/v1beta/openai/chat/completions
-      AI_MODEL=gemini-2.5-flash
+      AI_MODEL=gemini-3.6-flash
       AI_TIMEOUT_MS=15000
       AI_SITE_URL=https://hyeboard.vercel.app
       AI_SITE_NAME=HyeBoard

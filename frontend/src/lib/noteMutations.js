@@ -85,14 +85,20 @@ export async function createNoteLocally(userId, values) {
 export async function importNotesLocally(userId, records, options = {}) {
   const normalizedUserId = getUserId(userId);
   if (!normalizedUserId) throw new Error("Authenticated user is required");
-  const { notes: existingNotes, trash: existingTrash } = await getLocalNotesForUser(normalizedUserId);
+  const { notes: existingNotes, trash: existingTrash } =
+    await getLocalNotesForUser(normalizedUserId);
   const existing = [...existingNotes, ...existingTrash];
   const duplicateMode = options.duplicateMode === "skip" ? "skip" : "copy";
   const idMap = new Map();
   const planned = records.map((record) => {
     const duplicate = existing.find(
       (note) =>
-        String(note.title || "").trim().toLowerCase() === String(record.title || "").trim().toLowerCase() &&
+        String(note.title || "")
+          .trim()
+          .toLowerCase() ===
+          String(record.title || "")
+            .trim()
+            .toLowerCase() &&
         String(note.content || "") === String(record.content || ""),
     );
     if (duplicate && duplicateMode === "skip") {
@@ -124,7 +130,9 @@ export async function importNotesLocally(userId, records, options = {}) {
       isFavorite: record.isFavorite,
     });
     let importedNote = result.note;
-    if (record.deletedAt) importedNote = (await trashNoteLocally(normalizedUserId, importedNote)).note;
+    if (record.deletedAt)
+      importedNote = (await trashNoteLocally(normalizedUserId, importedNote))
+        .note;
     imported.push(importedNote);
     options.onProgress?.(index + 1, planned.length);
   }

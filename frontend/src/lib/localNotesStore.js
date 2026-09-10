@@ -197,7 +197,11 @@ export async function getLocalNoteForUser(userId, noteId) {
   );
 }
 
-export async function saveLocalNoteVersion(userId, note, operationType = "UPDATE_NOTE") {
+export async function saveLocalNoteVersion(
+  userId,
+  note,
+  operationType = "UPDATE_NOTE",
+) {
   if (!userId || !note?._id || !isIndexedDBAvailable()) return null;
   const database = await openDatabase();
   const version = {
@@ -221,7 +225,9 @@ export async function saveLocalNoteVersion(userId, note, operationType = "UPDATE
     store.index("userNote").getAll([version.userId, version.noteId]),
   );
   versions.sort((left, right) => right.createdAt.localeCompare(left.createdAt));
-  versions.slice(MAX_LOCAL_VERSIONS_PER_NOTE).forEach((item) => store.delete(item.versionId));
+  versions
+    .slice(MAX_LOCAL_VERSIONS_PER_NOTE)
+    .forEach((item) => store.delete(item.versionId));
   return version;
 }
 
@@ -230,12 +236,14 @@ export async function getLocalNoteVersions(userId, noteId) {
   const database = await openDatabase();
   const transaction = database.transaction(VERSION_STORE_NAME, "readonly");
   const versions = await requestResult(
-    transaction.objectStore(VERSION_STORE_NAME).index("userNote").getAll([
-      normalizeUserId(userId),
-      noteId,
-    ]),
+    transaction
+      .objectStore(VERSION_STORE_NAME)
+      .index("userNote")
+      .getAll([normalizeUserId(userId), noteId]),
   );
-  return versions.sort((left, right) => right.createdAt.localeCompare(left.createdAt));
+  return versions.sort((left, right) =>
+    right.createdAt.localeCompare(left.createdAt),
+  );
 }
 
 export async function persistLocalNotesForUser(userId, notes = [], trash = []) {
@@ -483,7 +491,10 @@ export async function replaceLocalNoteIdForUser(userId, localId, serverNote) {
   });
 
   const database = await openDatabase();
-  const versionTransaction = database.transaction(VERSION_STORE_NAME, "readwrite");
+  const versionTransaction = database.transaction(
+    VERSION_STORE_NAME,
+    "readwrite",
+  );
   const versionStore = versionTransaction.objectStore(VERSION_STORE_NAME);
   const localVersions = await requestResult(
     versionStore.index("userNote").getAll([normalizeUserId(userId), localId]),

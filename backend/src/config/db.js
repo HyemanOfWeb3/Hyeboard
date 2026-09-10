@@ -17,7 +17,7 @@ if (!MONGO_URI) {
       : "MONGO_URI environment variable is not set!",
   );
   console.warn(
-    "Set MONGO_URI in your environment variables for database connectivity"
+    "Set MONGO_URI in your environment variables for database connectivity",
   );
 }
 
@@ -38,7 +38,7 @@ export const connectDB = async () => {
     // Ensure a valid connection string is provided
     if (!MONGO_URI || typeof MONGO_URI !== "string" || MONGO_URI.length === 0) {
       throw new Error(
-        "MONGO_URI environment variable is required but not set. Please configure it in your deployment settings."
+        "MONGO_URI environment variable is required but not set. Please configure it in your deployment settings.",
       );
     }
 

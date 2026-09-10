@@ -1,6 +1,13 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useNavigate } from "react-router";
-import { Filter, Network, RefreshCw, Search, SlidersHorizontal, X } from "lucide-react";
+import {
+  Filter,
+  Network,
+  RefreshCw,
+  Search,
+  SlidersHorizontal,
+  X,
+} from "lucide-react";
 import { toast } from "react-hot-toast";
 import Navbar from "../components/Navbar";
 import Sidebar from "../components/Sidebar";
@@ -22,7 +29,11 @@ import {
   mergeServerWithLocal,
   persistLocalNotesForUser,
 } from "../lib/localNotesStore";
-import { deriveNoteGraph, deriveOrphanNotes, getNoteReference } from "../lib/noteLinks";
+import {
+  deriveNoteGraph,
+  deriveOrphanNotes,
+  getNoteReference,
+} from "../lib/noteLinks";
 
 const HomePage = () => {
   const navigate = useNavigate();
@@ -180,7 +191,12 @@ const HomePage = () => {
 
   const relationshipIndex = useMemo(() => {
     const graph = deriveNoteGraph(notes);
-    const titlesById = new Map(notes.map((note) => [getNoteReference(note), note.title || "Untitled note"]));
+    const titlesById = new Map(
+      notes.map((note) => [
+        getNoteReference(note),
+        note.title || "Untitled note",
+      ]),
+    );
     const linkedIds = new Set();
     const linkedTitles = new Map();
     graph.edges.forEach((edge) => {
@@ -214,11 +230,15 @@ const HomePage = () => {
           new Date(note.updatedAt || note.createdAt).toDateString() ===
           new Date().toDateString(),
       );
-      if (activeView === "orphan") result = deriveOrphanNotes(notes);
-      if (relationshipFilter === "linked")
-        result = result.filter((note) => relationshipIndex.linkedIds.has(getNoteReference(note)));
-      if (relationshipFilter === "unlinked")
-        result = result.filter((note) => !relationshipIndex.linkedIds.has(getNoteReference(note)));
+    if (activeView === "orphan") result = deriveOrphanNotes(notes);
+    if (relationshipFilter === "linked")
+      result = result.filter((note) =>
+        relationshipIndex.linkedIds.has(getNoteReference(note)),
+      );
+    if (relationshipFilter === "unlinked")
+      result = result.filter(
+        (note) => !relationshipIndex.linkedIds.has(getNoteReference(note)),
+      );
     if (activeView.startsWith("tag:"))
       result = result.filter((note) =>
         (note.tags || []).includes(activeView.slice(4)),
@@ -240,7 +260,15 @@ const HomePage = () => {
         new Date(a.updatedAt || a.createdAt)
       );
     });
-  }, [activeView, debouncedSearch, notes, relationshipFilter, relationshipIndex, sort, trash]);
+  }, [
+    activeView,
+    debouncedSearch,
+    notes,
+    relationshipFilter,
+    relationshipIndex,
+    sort,
+    trash,
+  ]);
 
   const updateNote = async (note, field) => {
     const userId = user?.id || user?._id;
@@ -389,7 +417,10 @@ const HomePage = () => {
               )}
             </label>
             <div className="toolbar__controls">
-              <ImportExportPanel userId={user?.id || user?._id} onComplete={fetchNotes} />
+              <ImportExportPanel
+                userId={user?.id || user?._id}
+                onComplete={fetchNotes}
+              />
               <label className="select-control">
                 <SlidersHorizontal size={15} />
                 <span>Sort</span>
@@ -411,7 +442,10 @@ const HomePage = () => {
           <div className="relationship-filter" aria-label="Relationship filter">
             <Network size={15} />
             <span>Relationships</span>
-            <select value={relationshipFilter} onChange={(event) => setRelationshipFilter(event.target.value)}>
+            <select
+              value={relationshipFilter}
+              onChange={(event) => setRelationshipFilter(event.target.value)}
+            >
               <option value="all">All notes</option>
               <option value="linked">Linked notes</option>
               <option value="unlinked">Unlinked notes</option>
@@ -454,7 +488,10 @@ const HomePage = () => {
         onClose={() => setPaletteOpen(false)}
         onCommand={command}
       />
-      <KnowledgeAssistant open={assistantOpen} onClose={() => setAssistantOpen(false)} />
+      <KnowledgeAssistant
+        open={assistantOpen}
+        onClose={() => setAssistantOpen(false)}
+      />
     </div>
   );
 };

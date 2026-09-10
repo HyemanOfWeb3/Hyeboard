@@ -114,32 +114,105 @@ const NoteLinkPreview = ({ content, userId, note }) => {
       className="note-link-preview"
       aria-label="Linked notes and rendered content"
     >
-      {links.length > 0 && <div className="note-content-preview">
-        <span className="eyebrow">Preview</span>
-        <div>
-          {content.split("\n").map((line, index) => (
-            <p key={index}>{renderLine(line, index)}</p>
-          ))}
+      {links.length > 0 && (
+        <div className="note-content-preview">
+          <span className="eyebrow">Preview</span>
+          <div>
+            {content.split("\n").map((line, index) => (
+              <p key={index}>{renderLine(line, index)}</p>
+            ))}
+          </div>
         </div>
-      </div>}
-      {links.length > 0 && <div id="linked-notes" className="note-context-section"><span className="eyebrow">Linked notes</span><div className="note-link-preview__list">
-        {outgoingNotes.map((target) => (
-          <Link key={getNoteReference(target)} to={getNoteHref(target)} className="note-link-preview__item">
-            <span>{target.title || "Untitled note"}</span>
-            <small>Outgoing link</small>
-          </Link>
-        ))}
-        {links.some((link) => !targets[link.reference]) && <span className="note-link-preview__item note-link-preview__item--broken"><span>Unavailable link</span><small>Note is not available locally</small></span>}
-      </div></div>}
-      <div id="backlinks" className="backlink-section note-context-section" aria-labelledby="backlinks-heading">
-        <span className="eyebrow" id="backlinks-heading">Linked from</span>
-        {backlinks.length ? <div className="backlink-list">{backlinks.map((sourceNote) => <Link key={getNoteReference(sourceNote)} to={getNoteHref(sourceNote)} className="backlink-item"><strong>{sourceNote.title || "Untitled note"}</strong><small>Updated {new Date(sourceNote.updatedAt || sourceNote.createdAt).toLocaleDateString()}</small></Link>)}</div> : <p className="backlink-empty">No notes link to this note yet.</p>}
+      )}
+      {links.length > 0 && (
+        <div id="linked-notes" className="note-context-section">
+          <span className="eyebrow">Linked notes</span>
+          <div className="note-link-preview__list">
+            {outgoingNotes.map((target) => (
+              <Link
+                key={getNoteReference(target)}
+                to={getNoteHref(target)}
+                className="note-link-preview__item"
+              >
+                <span>{target.title || "Untitled note"}</span>
+                <small>Outgoing link</small>
+              </Link>
+            ))}
+            {links.some((link) => !targets[link.reference]) && (
+              <span className="note-link-preview__item note-link-preview__item--broken">
+                <span>Unavailable link</span>
+                <small>Note is not available locally</small>
+              </span>
+            )}
+          </div>
+        </div>
+      )}
+      <div
+        id="backlinks"
+        className="backlink-section note-context-section"
+        aria-labelledby="backlinks-heading"
+      >
+        <span className="eyebrow" id="backlinks-heading">
+          Linked from
+        </span>
+        {backlinks.length ? (
+          <div className="backlink-list">
+            {backlinks.map((sourceNote) => (
+              <Link
+                key={getNoteReference(sourceNote)}
+                to={getNoteHref(sourceNote)}
+                className="backlink-item"
+              >
+                <strong>{sourceNote.title || "Untitled note"}</strong>
+                <small>
+                  Updated{" "}
+                  {new Date(
+                    sourceNote.updatedAt || sourceNote.createdAt,
+                  ).toLocaleDateString()}
+                </small>
+              </Link>
+            ))}
+          </div>
+        ) : (
+          <p className="backlink-empty">No notes link to this note yet.</p>
+        )}
       </div>
-      {relatedNotes.length > 0 && <div id="related-notes" className="note-context-section related-notes-section"><span className="eyebrow">Related notes</span><small className="context-explanation">Shared tags, not semantic similarity</small><div className="backlink-list">{relatedNotes.map((relatedNote) => <Link key={getNoteReference(relatedNote)} to={getNoteHref(relatedNote)} className="backlink-item"><strong>{relatedNote.title || "Untitled note"}</strong><small>{(relatedNote.tags || []).join(" · ")}</small></Link>)}</div></div>}
+      {relatedNotes.length > 0 && (
+        <div
+          id="related-notes"
+          className="note-context-section related-notes-section"
+        >
+          <span className="eyebrow">Related notes</span>
+          <small className="context-explanation">
+            Shared tags, not semantic similarity
+          </small>
+          <div className="backlink-list">
+            {relatedNotes.map((relatedNote) => (
+              <Link
+                key={getNoteReference(relatedNote)}
+                to={getNoteHref(relatedNote)}
+                className="backlink-item"
+              >
+                <strong>{relatedNote.title || "Untitled note"}</strong>
+                <small>{(relatedNote.tags || []).join(" · ")}</small>
+              </Link>
+            ))}
+          </div>
+        </div>
+      )}
       <div className="note-context-footer">
         <span className="eyebrow">Tags</span>
-        <span className="note-context-tags">{note?.tags?.length ? note.tags.map((tag) => `#${tag}`).join(" ") : "No tags"}</span>
-        <Link className="text-button" to={`/graph/${encodeURIComponent(getNoteReference(note))}`}>Open graph</Link>
+        <span className="note-context-tags">
+          {note?.tags?.length
+            ? note.tags.map((tag) => `#${tag}`).join(" ")
+            : "No tags"}
+        </span>
+        <Link
+          className="text-button"
+          to={`/graph/${encodeURIComponent(getNoteReference(note))}`}
+        >
+          Open graph
+        </Link>
       </div>
     </section>
   );

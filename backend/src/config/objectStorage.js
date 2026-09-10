@@ -21,7 +21,12 @@ export function getAttachmentBucket() {
 export function getObjectStorageClient() {
   const region = process.env.S3_REGION || process.env.AWS_REGION;
   const bucket = getAttachmentBucket();
-  if (!region || !bucket || !process.env.S3_ACCESS_KEY_ID || !process.env.S3_SECRET_ACCESS_KEY) {
+  if (
+    !region ||
+    !bucket ||
+    !process.env.S3_ACCESS_KEY_ID ||
+    !process.env.S3_SECRET_ACCESS_KEY
+  ) {
     throw new Error("Object storage is not configured");
   }
   return {

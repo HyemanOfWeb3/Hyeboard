@@ -1,10 +1,29 @@
 const IGNORED_TOKENS = new Set([
-  "about", "after", "also", "does", "from", "have", "into", "that", "this",
-  "what", "when", "where", "which", "with", "your",
+  "about",
+  "after",
+  "also",
+  "does",
+  "from",
+  "have",
+  "into",
+  "that",
+  "this",
+  "what",
+  "when",
+  "where",
+  "which",
+  "with",
+  "your",
 ]);
 
 export function searchTokens(question) {
-  return Array.from(new Set(String(question || "").toLowerCase().match(/[a-z0-9][a-z0-9_-]{1,}/g) || []))
+  return Array.from(
+    new Set(
+      String(question || "")
+        .toLowerCase()
+        .match(/[a-z0-9][a-z0-9_-]{1,}/g) || [],
+    ),
+  )
     .filter((token) => !IGNORED_TOKENS.has(token))
     .slice(0, 12);
 }
@@ -14,7 +33,11 @@ export function scoreNote(note, tokens) {
   const tags = (note.tags || []).join(" ").toLowerCase();
   const content = String(note.content || "").toLowerCase();
   return tokens.reduce(
-    (score, token) => score + (title.includes(token) ? 8 : 0) + (tags.includes(token) ? 5 : 0) + (content.includes(token) ? 1 : 0),
+    (score, token) =>
+      score +
+      (title.includes(token) ? 8 : 0) +
+      (tags.includes(token) ? 5 : 0) +
+      (content.includes(token) ? 1 : 0),
     0,
   );
 }
@@ -25,16 +48,26 @@ export function rankNotes(notes = [], question, limit = 8) {
     .filter((note) => note && !note.deletedAt)
     .map((note) => ({ note, score: scoreNote(note, tokens) }))
     .filter((item) => item.score > 0)
-    .sort((left, right) => right.score - left.score || String(left.note._id || left.note.id).localeCompare(String(right.note._id || right.note.id)))
+    .sort(
+      (left, right) =>
+        right.score - left.score ||
+        String(left.note._id || left.note.id).localeCompare(
+          String(right.note._id || right.note.id),
+        ),
+    )
     .slice(0, limit);
 }
 
 export function evaluateRetrieval(dataset, limit = 3) {
   const results = dataset.queries.map((query) => {
-    const retrieved = rankNotes(dataset.notes, query.question, limit).map(({ note }) => String(note.id || note._id));
+    const retrieved = rankNotes(dataset.notes, query.question, limit).map(
+      ({ note }) => String(note.id || note._id),
+    );
     const expected = new Set(query.expectedIds.map(String));
     const relevantRetrieved = retrieved.filter((id) => expected.has(id));
-    const precision = retrieved.length ? relevantRetrieved.length / retrieved.length : 0;
+    const precision = retrieved.length
+      ? relevantRetrieved.length / retrieved.length
+      : 0;
     const recall = expected.size ? relevantRetrieved.length / expected.size : 0;
     return {
       id: query.id,
@@ -43,14 +76,25 @@ export function evaluateRetrieval(dataset, limit = 3) {
       precision,
       recall,
       hit: relevantRetrieved.length > 0,
-      leakedDeleted: retrieved.some((id) => dataset.notes.find((note) => String(note.id || note._id) === id)?.deletedAt),
+      leakedDeleted: retrieved.some(
+        (id) =>
+          dataset.notes.find((note) => String(note.id || note._id) === id)
+            ?.deletedAt,
+      ),
     };
   });
   return {
     results,
-    precisionAtK: results.length ? results.reduce((sum, result) => sum + result.precision, 0) / results.length : 0,
-    recallAtK: results.length ? results.reduce((sum, result) => sum + result.recall, 0) / results.length : 0,
-    hitRate: results.length ? results.filter((result) => result.hit).length / results.length : 0,
+    precisionAtK: results.length
+      ? results.reduce((sum, result) => sum + result.precision, 0) /
+        results.length
+      : 0,
+    recallAtK: results.length
+      ? results.reduce((sum, result) => sum + result.recall, 0) / results.length
+      : 0,
+    hitRate: results.length
+      ? results.filter((result) => result.hit).length / results.length
+      : 0,
     deletedLeaks: results.filter((result) => result.leakedDeleted).length,
   };
 }
@@ -59,9 +103,16 @@ export function evaluateRetrievalByClass(dataset, limit = 3) {
   const report = evaluateRetrieval(dataset, limit);
   const byClass = {};
   report.results.forEach((result) => {
-    const query = dataset.queries.find((candidate) => candidate.id === result.id);
+    const query = dataset.queries.find(
+      (candidate) => candidate.id === result.id,
+    );
     const category = query?.category || "uncategorized";
-    const bucket = byClass[category] || { queries: 0, hits: 0, precision: 0, recall: 0 };
+    const bucket = byClass[category] || {
+      queries: 0,
+      hits: 0,
+      precision: 0,
+      recall: 0,
+    };
     bucket.queries += 1;
     bucket.hits += result.hit ? 1 : 0;
     bucket.precision += result.precision;
@@ -70,7 +121,9 @@ export function evaluateRetrievalByClass(dataset, limit = 3) {
   });
   Object.values(byClass).forEach((bucket) => {
     bucket.hitRate = bucket.queries ? bucket.hits / bucket.queries : 0;
-    bucket.precisionAtK = bucket.queries ? bucket.precision / bucket.queries : 0;
+    bucket.precisionAtK = bucket.queries
+      ? bucket.precision / bucket.queries
+      : 0;
     bucket.recallAtK = bucket.queries ? bucket.recall / bucket.queries : 0;
     delete bucket.hits;
     delete bucket.precision;
