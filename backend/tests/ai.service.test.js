@@ -6,6 +6,7 @@ import {
   getAIMetrics,
 } from "../src/services/aiService.js";
 import { setGeminiTestGenerator } from "../src/services/geminiProvider.js";
+import { getAIConfig } from "../src/config/ai.js";
 
 const originalFetch = global.fetch;
 const originalKey = process.env.AI_API_KEY;
@@ -34,6 +35,7 @@ afterEach(() => {
 
 test("AI service returns sanitized summary and caches duplicate requests", async () => {
   process.env.AI_API_KEY = "test-only-key";
+  process.env.AI_PROVIDER = "openrouter";
   let calls = 0;
   global.fetch = async () => {
     calls += 1;
@@ -65,6 +67,7 @@ test("AI service returns sanitized summary and caches duplicate requests", async
 
 test("AI service rejects malformed provider output", async () => {
   process.env.AI_API_KEY = "test-only-key";
+  process.env.AI_PROVIDER = "openrouter";
   global.fetch = async () =>
     providerResponse({ choices: [{ message: { content: "not json" } }] });
   await assert.rejects(
@@ -78,6 +81,7 @@ test("AI service rejects malformed provider output", async () => {
 
 test("AI service maps provider rate limits", async () => {
   process.env.AI_API_KEY = "test-only-key";
+  process.env.AI_PROVIDER = "openrouter";
   global.fetch = async () => providerResponse({}, 429);
   await assert.rejects(
     generateNoteInsight({
@@ -90,6 +94,7 @@ test("AI service maps provider rate limits", async () => {
 
 test("AI service maps provider timeouts", async () => {
   process.env.AI_API_KEY = "test-only-key";
+  process.env.AI_PROVIDER = "openrouter";
   process.env.AI_TIMEOUT_MS = "1";
   global.fetch = async (_url, options) =>
     new Promise((resolve, reject) => {
@@ -110,6 +115,7 @@ test("AI service maps provider timeouts", async () => {
 
 test("AI service rejects oversized note input before provider call", async () => {
   process.env.AI_API_KEY = "test-only-key";
+  process.env.AI_PROVIDER = "openrouter";
   let called = false;
   global.fetch = async () => {
     called = true;
@@ -132,6 +138,7 @@ test("AI service fails closed without a provider key", async () => {
 
 test("knowledge assistant returns a bounded attributed answer", async () => {
   process.env.AI_API_KEY = "test-only-key";
+  process.env.AI_PROVIDER = "openrouter";
   global.fetch = async () =>
     providerResponse({
       choices: [
@@ -173,6 +180,7 @@ test("knowledge assistant answers no-match questions without a provider call", a
 
 test("prompt injection remains data in the user message", async () => {
   process.env.AI_API_KEY = "test-only-key";
+  process.env.AI_PROVIDER = "openrouter";
   let requestBody;
   global.fetch = async (_url, options) => {
     requestBody = JSON.parse(options.body);
@@ -223,4 +231,13 @@ test("Gemini provider adapter supplies structured JSON to the existing feature s
     note: note("unique-gemini-adapter-test"),
   });
   assert.deepEqual(result.tags, ["gemini", "notes"]);
+});
+
+test("AI configuration defaults to the Gemini SDK provider", () => {
+  delete process.env.AI_PROVIDER;
+  delete process.env.AI_MODEL;
+  delete process.env.GEMINI_MODEL;
+  const config = getAIConfig();
+  assert.equal(config.provider, "gemini");
+  assert.equal(config.model, "gemini-2.5-flash");
 });

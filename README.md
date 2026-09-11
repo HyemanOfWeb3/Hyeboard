@@ -64,13 +64,9 @@ A full-stack web application for creating, reading, updating, and deleting notes
    S3_ENDPOINT=https://your-storage-endpoint
    S3_FORCE_PATH_STYLE=false
       # Optional server-side AI provider configuration
-      AI_PROVIDER=gemini
-      GEMINI_API_KEY=server_only_provider_key
-      AI_API_URL=https://generativelanguage.googleapis.com/v1beta/openai/chat/completions
-      AI_MODEL=gemini-3.6-flash
+      GEMINI_API_KEY=server_only_gemini_key
+      GEMINI_MODEL=gemini-2.5-flash
       AI_TIMEOUT_MS=15000
-      AI_SITE_URL=https://hyeboard.vercel.app
-      AI_SITE_NAME=HyeBoard
    PORT=5000
    ```
 
@@ -110,7 +106,7 @@ back, and Markdown/JSON note exports explicitly exclude binary content.
 ### Optional AI insights
 
 AI actions are explicit and note-scoped: summarize, key points, suggested tags, and
-possible related existing notes. The browser never receives `AI_API_KEY`. When an
+possible related existing notes. The browser never receives `GEMINI_API_KEY`. When an
 action runs, only the selected note's title, tags, and up to 12,000 characters of
 content are sent to the configured provider. Related-note analysis sends at most 20
 same-user candidate titles, tags, and short excerpts using opaque candidate labels.
@@ -119,10 +115,9 @@ used only to prevent duplicate requests on one server instance. Note content is
 treated as untrusted data, and AI suggestions never create links or edit tags
 automatically. AI is limited to five requests per user per five minutes, is
 unavailable offline, and the rest of the note app continues to work when no
-provider key is configured. The default provider is OpenRouter's `openrouter/free`
-router, which selects an available free model. You may set `AI_MODEL` to a specific
-OpenRouter model ending in `:free` when desired. Free models are subject to provider
-availability, quotas, latency, and quality limits.
+provider key is configured. The default provider is Google's Gemini API through the
+`@google/genai` SDK, using `gemini-2.5-flash`. Set `GEMINI_MODEL` when selecting a
+different Gemini model.
 
 ### Collaboration foundation
 
