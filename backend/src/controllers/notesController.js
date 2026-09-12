@@ -27,6 +27,10 @@ function baseRevisionFrom(req) {
   return value === undefined || value === null ? undefined : Number(value);
 }
 
+function hasInvalidBaseRevision(revision) {
+  return revision !== undefined && (!Number.isInteger(revision) || revision < 1);
+}
+
 function addRevisionFilter(filter, revision) {
   if (revision !== undefined) {
     filter.$or = [{ revision }, { revision: { $exists: false } }];
@@ -172,6 +176,8 @@ export async function getNoteVersions(req, res) {
 export async function restoreNoteVersion(req, res) {
   try {
     const baseRevision = baseRevisionFrom(req);
+    if (hasInvalidBaseRevision(baseRevision))
+      return res.status(400).json({ message: "baseRevision must be a positive integer" });
     const restore = async () => {
       const access = await getNoteAccess(req.params.id, req.user._id);
       const note = access?.note;
@@ -264,7 +270,17 @@ export async function createNote(req, res) {
         isFavorite: Boolean(isFavorite),
       });
 
-      const savedNote = await note.save();
+      let savedNote;
+      try {
+        savedNote = await note.save();
+      } catch (error) {
+        if (error.code !== 11000 || !clientNoteId) throw error;
+        savedNote = await Note.findOne({
+          user: req.user._id,
+          clientNoteId,
+        });
+        if (!savedNote) throw error;
+      }
       return { status: 201, body: savedNote };
     };
 
@@ -280,6 +296,8 @@ export async function updateNote(req, res) {
   try {
     const { title, content, tags, isPinned, isFavorite } = req.body;
     const baseRevision = baseRevisionFrom(req);
+    if (hasInvalidBaseRevision(baseRevision))
+      return res.status(400).json({ message: "baseRevision must be a positive integer" });
     const updates = { title, content };
     if (tags !== undefined) updates.tags = normalizeTags(tags);
     if (isPinned !== undefined) updates.isPinned = Boolean(isPinned);

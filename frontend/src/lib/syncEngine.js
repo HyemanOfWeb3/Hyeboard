@@ -17,6 +17,7 @@ let activeUserId = null;
 let running = false;
 let fallbackLock = false;
 let sequence = 0;
+let retryTimer = null;
 let snapshot = { status: "idle", userId: null, pending: 0, error: null };
 const subscribers = new Set();
 const channel =
@@ -100,15 +101,43 @@ async function request(operation) {
 
 async function applySuccessfulOperation(userId, operation, response) {
   const serverNote = response.data;
-  if (!serverNote || !serverNote._id) return;
+  if (!serverNote || !serverNote._id)
+    throw new Error("Sync response did not include the saved note");
+  const noteIds = new Set([operation.noteId, serverNote._id]);
+  let pendingForNote = false;
   if (operation.type === "CREATE_NOTE") {
     await replaceLocalNoteIdForUser(userId, operation.noteId, serverNote);
   } else {
     await upsertLocalNoteForUser(userId, serverNote);
+    const queued = await getOperationsForUser(userId);
+    await Promise.all(
+      queued
+        .filter(
+          (next) =>
+            noteIds.has(next.noteId) && next.status === "pending",
+        )
+        .map((next) =>
+          updateOperation({ ...next, baseRevision: serverNote.revision }),
+        ),
+    );
   }
   await deleteOperation(operation.operationId);
+  const remainingForNote = await getOperationsForUser(userId);
+  pendingForNote = remainingForNote.some(
+    (next) =>
+      noteIds.has(next.noteId) &&
+      ["pending", "syncing"].includes(next.status),
+  );
   await setSyncMeta(userId, { lastSuccessfulSyncAt: new Date().toISOString() });
-  channel?.postMessage({ type: "notes-changed", userId });
+  const event = {
+    type: "notes-changed",
+    userId,
+    noteId: operation.noteId,
+    serverNote,
+    pendingForNote,
+  };
+  channel?.postMessage(event);
+  window.dispatchEvent(new CustomEvent("hyeboard:note-synced", { detail: event }));
 }
 
 async function processOperation(userId, operation, currentSequence) {
@@ -129,8 +158,7 @@ async function processOperation(userId, operation, currentSequence) {
     if (status === 401) {
       await updateOperation({
         ...syncing,
-        status: "pending",
-        nextAttemptAt: new Date().toISOString(),
+        status: "auth-required",
         lastError: "Authentication required",
       });
       publish({ status: "auth-required", error: "Authentication required" });
@@ -200,6 +228,7 @@ async function processOperation(userId, operation, currentSequence) {
 async function flushWithoutLock(userId, currentSequence) {
   if (running || !isActive(userId, currentSequence)) return;
   running = true;
+  let nextAttemptAt = null;
   try {
     const operations = await getOperationsForUser(userId);
     await Promise.all(
@@ -245,12 +274,34 @@ async function flushWithoutLock(userId, currentSequence) {
       (operation) => operation.status === "conflict",
     );
     publish({
-      status: hasConflict ? "conflict" : hasPending ? "error" : "synced",
+      status: hasConflict
+        ? "conflict"
+        : hasPending
+          ? remaining.some(
+              (operation) =>
+                new Date(operation.nextAttemptAt || 0).getTime() > Date.now(),
+            )
+            ? "retrying"
+            : "queued"
+          : "synced",
       pending: remaining.filter((operation) => operation.status !== "synced")
         .length,
     });
+    const pendingTimes = remaining
+      .filter((operation) => ["pending", "syncing"].includes(operation.status))
+      .map((operation) => new Date(operation.nextAttemptAt || 0).getTime())
+      .filter((time) => Number.isFinite(time));
+    if (hasPending && pendingTimes.length)
+      nextAttemptAt = Math.min(...pendingTimes);
   } finally {
     running = false;
+    if (nextAttemptAt !== null && isActive(userId, currentSequence)) {
+      if (retryTimer) window.clearTimeout(retryTimer);
+      retryTimer = window.setTimeout(
+        () => requestSync(userId),
+        Math.max(0, nextAttemptAt - Date.now()),
+      );
+    }
   }
 }
 
@@ -301,6 +352,8 @@ export function stopSyncForUser(userId) {
   if (!userId || activeUserId !== String(userId)) return;
   activeUserId = null;
   sequence += 1;
+  if (retryTimer) window.clearTimeout(retryTimer);
+  retryTimer = null;
   publish({ userId: null, status: "idle", pending: 0, error: null });
 }
 
@@ -331,6 +384,10 @@ channel?.addEventListener("message", (event) => {
     event.data?.type === "notes-changed" &&
     event.data.userId === activeUserId
   ) {
+    if (event.data.serverNote)
+      window.dispatchEvent(
+        new CustomEvent("hyeboard:note-synced", { detail: event.data }),
+      );
     window.dispatchEvent(
       new CustomEvent("hyeboard:notes-changed", { detail: event.data }),
     );
@@ -341,7 +398,9 @@ export async function retryFailedOperations(userId) {
   const operations = await getOperationsForUser(userId);
   await Promise.all(
     operations
-      .filter((operation) => operation.status === "failed")
+      .filter((operation) =>
+        ["failed", "auth-required"].includes(operation.status),
+      )
       .map((operation) =>
         updateOperation({
           ...operation,

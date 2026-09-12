@@ -11,7 +11,7 @@ import {
 import { useState } from "react";
 import { useAuth } from "../lib/useAuth";
 
-const Navbar = ({ onSearch, onNewNote, onMenu, onAssistant }) => {
+const Navbar = ({ onSearch, onNewNote, onMenu, onAssistant, mobileOpen }) => {
   const { user, logout } = useAuth();
   const [open, setOpen] = useState(false);
   return (
@@ -21,6 +21,7 @@ const Navbar = ({ onSearch, onNewNote, onMenu, onAssistant }) => {
           className="mobile-menu icon-button"
           onClick={onMenu}
           aria-label="Open navigation"
+          aria-expanded={mobileOpen}
         >
           <Menu size={20} />
         </button>

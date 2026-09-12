@@ -778,3 +778,162 @@ kbd { background: rgba(255,255,255,.07); border: 1px solid var(--border); border
 @tailwind base;
 @tailwind components;
 @tailwind utilities;
+
+@media (max-width: 720px) {
+  .app-header__inner > .flex {
+    min-width: 0;
+    flex: 1;
+    gap: 8px;
+  }
+
+  .brand-mark {
+    flex: 1;
+    min-width: 0;
+    overflow: hidden;
+    font-size: 20px;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+
+  .header-actions {
+    flex-shrink: 0;
+  }
+
+  .header-actions .icon-button,
+  .header-actions .search-trigger,
+  .header-actions .primary-button,
+  .mobile-menu {
+    min-width: 44px;
+    min-height: 44px;
+  }
+
+  .header-actions .primary-button {
+    padding-inline: 10px;
+  }
+
+  .sidebar-wrap {
+    width: min(300px, 88vw);
+  }
+
+  .sidebar .icon-button,
+  .sidebar .nav-item,
+  .sidebar .tag-link {
+    min-height: 44px;
+  }
+
+  .toolbar {
+    gap: 10px;
+  }
+
+  .toolbar__controls {
+    display: flex;
+    flex-wrap: wrap;
+    width: 100%;
+  }
+
+  .toolbar__controls > * {
+    min-height: 44px;
+  }
+
+  .command-palette {
+    max-height: calc(100dvh - 28px);
+    display: grid;
+    grid-template-rows: auto minmax(0, 1fr) auto;
+  }
+
+  .command-palette__list {
+    min-height: 0;
+    overflow-y: auto;
+  }
+
+  .command-item {
+    min-height: 44px;
+  }
+
+  .ai-insights-panel__actions .focus-toggle,
+  .ai-related-list button {
+    min-height: 44px;
+  }
+}
+
+@media (max-width: 430px) {
+  .app-header__inner {
+    gap: 6px;
+    padding-inline: 10px;
+  }
+
+  .header-actions {
+    gap: 2px;
+  }
+
+  .header-actions > .icon-button[aria-label="Open knowledge assistant"] {
+    display: none;
+  }
+
+  .main-content {
+    padding-inline: 12px;
+  }
+
+  .page-heading {
+    align-items: center;
+    gap: 10px;
+  }
+
+  .page-heading h2 {
+    font-size: 30px;
+  }
+
+  .note-card__body {
+    padding: 16px;
+  }
+
+  .note-card__bottomline {
+    align-items: flex-end;
+  }
+
+  .editor-main {
+    padding-inline: 12px;
+  }
+
+  .editor-document-header {
+    gap: 10px;
+  }
+
+  .editor-document-header > .editor-header__actions {
+    max-width: 132px;
+  }
+
+  .editor-document-header > .editor-header__actions .focus-toggle {
+    min-height: 44px;
+    padding-inline: 9px;
+  }
+
+  .editor-toolbar {
+    gap: 4px;
+    overflow-x: auto;
+    flex-wrap: nowrap;
+    padding-block: 8px;
+  }
+
+  .editor-tool {
+    flex: 0 0 40px;
+    width: 40px;
+    height: 40px;
+  }
+
+  .editor-tool:nth-child(4),
+  .editor-tool:nth-child(8),
+  .editor-tool:nth-child(10) {
+    margin-left: 0;
+  }
+
+  .note-editor {
+    min-height: 52vh;
+    overflow-wrap: anywhere;
+  }
+
+  .editor-footer .delete-button,
+  .editor-footer .primary-button {
+    min-height: 44px;
+  }
+}

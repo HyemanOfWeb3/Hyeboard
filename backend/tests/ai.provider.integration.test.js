@@ -6,10 +6,11 @@ import {
 } from "../src/services/aiService.js";
 
 const enabled =
-  process.env.AI_INTEGRATION === "true" && Boolean(process.env.AI_API_KEY);
+  process.env.AI_INTEGRATION === "true" &&
+  Boolean(process.env.GEMINI_API_KEY || process.env.AI_API_KEY);
 const options = {
   skip: !enabled
-    ? "Set AI_INTEGRATION=true with a disposable restricted AI_API_KEY"
+    ? "Set AI_INTEGRATION=true with a disposable restricted GEMINI_API_KEY"
     : false,
 };
 const note = {

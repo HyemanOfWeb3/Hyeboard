@@ -139,6 +139,36 @@ const NoteDetailPage = () => {
       window.removeEventListener("hyeboard:conflict-change", handleConflict);
   }, [id, user?.id, user?._id]);
 
+  useEffect(() => {
+    const userId = user?.id || user?._id;
+    const handleSynced = (event) => {
+      const detail = event.detail;
+      if (
+        detail?.userId !== userId ||
+        detail.noteId !== id ||
+        !detail.serverNote
+      )
+        return;
+      setNote((current) => {
+        if (!current) return current;
+        if (detail.pendingForNote)
+          return { ...current, revision: detail.serverNote.revision };
+        setTags((detail.serverNote.tags || []).join(", "));
+        savedSnapshot.current = JSON.stringify({
+          title: detail.serverNote.title,
+          content: detail.serverNote.content,
+          tags: (detail.serverNote.tags || []).join(", "),
+          isPinned: detail.serverNote.isPinned,
+          isFavorite: detail.serverNote.isFavorite,
+        });
+        setStatus("Saved");
+        return detail.serverNote;
+      });
+    };
+    window.addEventListener("hyeboard:note-synced", handleSynced);
+    return () => window.removeEventListener("hyeboard:note-synced", handleSynced);
+  }, [id, user?.id, user?._id]);
+
   const saveNote = useCallback(
     async (showToast = false) => {
       if (conflictBlocked) return;

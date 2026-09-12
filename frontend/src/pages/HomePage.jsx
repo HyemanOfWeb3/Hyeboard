@@ -161,6 +161,13 @@ const HomePage = () => {
     window.addEventListener("keydown", onKeyDown);
     return () => window.removeEventListener("keydown", onKeyDown);
   }, [navigate]);
+  useEffect(() => {
+    const onKeyDown = (event) => {
+      if (event.key === "Escape") setMobileOpen(false);
+    };
+    window.addEventListener("keydown", onKeyDown);
+    return () => window.removeEventListener("keydown", onKeyDown);
+  }, []);
 
   const counts = useMemo(() => {
     const tagCounts = {};
@@ -354,6 +361,7 @@ const HomePage = () => {
         onSearch={() => setPaletteOpen(true)}
         onMenu={() => setMobileOpen(true)}
         onAssistant={() => setAssistantOpen(true)}
+        mobileOpen={mobileOpen}
       />
       <div className={`workspace ${collapsed ? "workspace--collapsed" : ""}`}>
         <div

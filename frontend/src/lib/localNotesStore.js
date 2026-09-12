@@ -173,6 +173,7 @@ export function mergeServerWithLocal(localNotes = [], serverNotes = []) {
         ...existing,
         ...localNote,
         _id: existing._id || localNote._id || id,
+        revision: Number(existing.revision || localNote.revision || 0),
         updatedAt: existing.updatedAt || localNote.updatedAt,
         localUpdatedAt: localNote.localUpdatedAt || localNote.updatedAt,
       });
