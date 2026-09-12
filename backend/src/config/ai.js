@@ -5,7 +5,7 @@ export const AI_MAX_RELATED_CANDIDATES = 20;
 export const DEFAULT_AI_API_URL =
   "https://openrouter.ai/api/v1/chat/completions";
 export const DEFAULT_AI_MODEL = "openrouter/free";
-export const GEMINI_MODEL = "gemini-3.5-flash-lite";
+export const GEMINI_MODEL = "gemini-3.6-flash";
 
 export function getAIConfig() {
   const configuredProvider = String(

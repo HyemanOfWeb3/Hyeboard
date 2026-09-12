@@ -239,7 +239,7 @@ test("AI configuration defaults to the Gemini SDK provider", () => {
   delete process.env.GEMINI_MODEL;
   const config = getAIConfig();
   assert.equal(config.provider, "gemini");
-  assert.equal(config.model, "gemini-3.5-flash-lite");
+  assert.equal(config.model, "gemini-3.6-flash");
 });
 
 test("Gemini configuration does not inherit the OpenRouter model variable", () => {
@@ -248,6 +248,6 @@ test("Gemini configuration does not inherit the OpenRouter model variable", () =
   delete process.env.GEMINI_MODEL;
   const config = getAIConfig();
   assert.equal(config.provider, "gemini");
-  assert.equal(config.model, "gemini-3.5-flash-lite");
+  assert.equal(config.model, "gemini-3.6-flash");
   delete process.env.AI_MODEL;
 });
