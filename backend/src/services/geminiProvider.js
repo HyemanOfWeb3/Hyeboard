@@ -169,6 +169,7 @@ export async function generateGeminiJson({
     config: {
       systemInstruction,
       temperature: kind === "assistant" ? 0.1 : 0.2,
+      thinkingConfig: { thinkingLevel: "low" },
       responseMimeType: "application/json",
       responseSchema: schema,
     },

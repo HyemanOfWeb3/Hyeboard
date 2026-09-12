@@ -105,6 +105,32 @@ function conflictResponse(res, serverNote) {
   });
 }
 
+async function recordNoteUpdateSideEffects({ actor, note, revision }) {
+  const results = await Promise.allSettled([
+    writeAudit({
+      actor,
+      note,
+      action: "note.updated",
+      metadata: { revision },
+    }),
+    writeCollaborationEvent({
+      actor,
+      note,
+      type: "note.updated",
+      revision,
+    }),
+  ]);
+  results.forEach((result, index) => {
+    if (result.status === "rejected")
+      console.error("Note update side effect failed", {
+        effect: index === 0 ? "audit" : "collaboration-event",
+        note: String(note),
+        actor: String(actor),
+        error: result.reason?.message || "unknown error",
+      });
+  });
+}
+
 async function saveVersion(note, operationType = "UPDATE_NOTE") {
   if (!note?._id || !note.user || !note.revision) return;
   await NoteVersion.updateOne(
@@ -326,16 +352,9 @@ export async function updateNote(req, res) {
         { new: true, runValidators: true },
       );
       if (updatedNote) {
-        await writeAudit({
+        await recordNoteUpdateSideEffects({
           actor: req.user._id,
           note: updatedNote._id,
-          action: "note.updated",
-          metadata: { revision: updatedNote.revision },
-        });
-        await writeCollaborationEvent({
-          actor: req.user._id,
-          note: updatedNote._id,
-          type: "note.updated",
           revision: updatedNote.revision,
         });
         return { status: 200, body: updatedNote };
@@ -490,11 +509,9 @@ export async function restoreNote(req, res) {
 
 export async function permanentlyDeleteNote(req, res) {
   try {
-    const note = await Note.findOne({
-      _id: req.params.id,
-      user: req.user._id,
-      deletedAt: { $ne: null },
-    });
+    const note = await Note.findOne(
+      noteReferenceFilter(req.params.id, req.user._id, true),
+    );
     if (!note)
       return res.status(404).json({ message: "Trashed note not found" });
     await deleteAttachmentsForNote(note._id, req.user._id);

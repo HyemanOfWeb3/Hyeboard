@@ -78,43 +78,44 @@ const NoteDetailPage = () => {
   useEffect(() => {
     const fetchNote = async () => {
       const userId = user?.id || user?._id;
-      try {
-        const response = await api.get(`/notes/${id}`);
-        setNote(response.data);
-        setTags((response.data.tags || []).join(", "));
+      let cachedNote = null;
+
+      const hydrate = (nextNote, nextStatus = "Saved") => {
+        setNote(nextNote);
+        setTags((nextNote.tags || []).join(", "));
         savedSnapshot.current = JSON.stringify({
-          title: response.data.title,
-          content: response.data.content,
-          tags: (response.data.tags || []).join(", "),
-          isPinned: response.data.isPinned,
-          isFavorite: response.data.isFavorite,
+          title: nextNote.title,
+          content: nextNote.content,
+          tags: (nextNote.tags || []).join(", "),
+          isPinned: nextNote.isPinned,
+          isFavorite: nextNote.isFavorite,
         });
         hydrated.current = true;
-      } catch {
-        if (userId) {
-          const { notes, trash } = await getLocalNotesForUser(userId);
-          const cachedNote = [...notes, ...trash].find(
+        setStatus(nextStatus);
+      };
+
+      if (userId) {
+        try {
+          const scope = await getLocalNotesForUser(userId);
+          cachedNote = [...scope.notes, ...scope.trash].find(
             (item) =>
               (item._id || item.id || item.clientNoteId) === id ||
               item.clientNoteId === id,
           );
           if (cachedNote) {
-            setNote(cachedNote);
-            setTags((cachedNote.tags || []).join(", "));
-            savedSnapshot.current = JSON.stringify({
-              title: cachedNote.title,
-              content: cachedNote.content,
-              tags: (cachedNote.tags || []).join(", "),
-              isPinned: cachedNote.isPinned,
-              isFavorite: cachedNote.isFavorite,
-            });
-            hydrated.current = true;
-            setStatus("Saved locally");
-            toast("Showing cached version while offline", { icon: "📦" });
-            return;
+            hydrate(cachedNote, navigator.onLine ? "Refreshing..." : "Saved locally");
+            setLoading(false);
           }
+        } catch {
+          // The server remains the source of truth when local storage is unavailable.
         }
-        toast.error("Could not fetch this note");
+      }
+
+      try {
+        const response = await api.get(`/notes/${id}`);
+        hydrate(response.data);
+      } catch {
+        if (!cachedNote) toast.error("Could not fetch this note");
       } finally {
         setLoading(false);
       }
