@@ -65,7 +65,7 @@ A full-stack web application for creating, reading, updating, and deleting notes
    S3_FORCE_PATH_STYLE=false
       # Optional server-side AI provider configuration
       GEMINI_API_KEY=server_only_gemini_key
-      GEMINI_MODEL=gemini-3.6-flash
+      GEMINI_MODEL=gemini-3.5-flash-lite
       AI_TIMEOUT_MS=15000
    PORT=5000
    ```
@@ -116,7 +116,7 @@ treated as untrusted data, and AI suggestions never create links or edit tags
 automatically. AI is limited to five requests per user per five minutes, is
 unavailable offline, and the rest of the note app continues to work when no
 provider key is configured. The default provider is Google's Gemini API through the
-`@google/genai` SDK, using `gemini-3.6-flash`. Set `GEMINI_MODEL` when selecting a
+`@google/genai` SDK, using `gemini-3.5-flash-lite`. Set `GEMINI_MODEL` when selecting a
 different Gemini model.
 
 ### Collaboration foundation
